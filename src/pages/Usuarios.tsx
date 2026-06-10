@@ -1,315 +1,208 @@
 import React, { useState, useEffect } from "react";
-import api from "../services/api";
+import api from "@/services/api";
+import Modal from "@/components/Modal";
+import PageHeader from "@/components/PageHeader";
+import { useToast } from "@/hooks/useToast";
+import ToastContainer from "@/components/Toast";
+import type { User } from "@/types";
+import { Plus, Edit, Lock } from "lucide-react";
+
+const SETORES  = ["ALMOXARIFADO", "ENGENHARIA", "MANUTENCAO"];
+const NIVEIS   = ["OPERADOR", "ADMIN"];
+const MODULOS_ALL = [
+  "Dashboard","Consultar","Entrada","Saída","Histórico Cupons","Devolução","Entregas Pend.","Combustíveis","Produtos",
+  "Valor Estoque","Inventário","Funcionários","Equipes","Frotas","Suprimentos Kobo","Pedidos de Compra","EPI",
+  "Obras & Projetos","Fornecedores","Débitos Oficina","Relatórios","Backup","Usuários","Meus Pedidos","Equipamentos",
+];
+
+const NIVEL_COLOR: Record<string, string> = {
+  ADMIN: "bg-amber-100 text-amber-800",
+  OPERADOR: "bg-blue-100 text-blue-800",
+};
 
 export default function Usuarios() {
-  const [users, setUsers] = useState<Record<string, any>>({});
+  const toast = useToast();
+  const [users, setUsers]   = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [modal, setModal]   = useState<"create" | "edit" | "senha" | null>(null);
+  const [target, setTarget] = useState<User | null>(null);
+  const [form, setForm]     = useState<Partial<User & { senha: string }>>({ setor: "ALMOXARIFADO", nivel: "OPERADOR", modulos: [] });
+  const [novaSenha, setNovaSenha] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  // Reg States
-  const [newUsername, setNewUsername] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [newRole, setNewRole] = useState("OPERADOR");
-  const [newSector, setNewSector] = useState("PEÇA LEVE");
+  const load = () => {
+    setLoading(true);
+    api.usuarios.list().then((r) => {
+      const d = (r as { data: User[] }).data ?? [];
+      setUsers(Array.isArray(d) ? d : Object.values(d));
+    }).finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
 
-  // Restore States
-  const [uploadJson, setUploadJson] = useState("");
-  const [successMsg, setSuccessMsg] = useState("");
-  const [errorMsg, setErrorMsg] = useState("");
+  const openCreate = () => { setForm({ setor: "ALMOXARIFADO", nivel: "OPERADOR", modulos: [] }); setModal("create"); };
+  const openEdit   = (u: User) => { setTarget(u); setForm({ ...u }); setModal("edit"); };
+  const openSenha  = (u: User) => { setTarget(u); setNovaSenha(""); setModal("senha"); };
 
-  const loadData = async () => {
+  const toggleModulo = (m: string) => setForm((p) => {
+    const prev = p.modulos ?? [];
+    return { ...p, modulos: prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m] };
+  });
+
+  const handleSave = async () => {
+    if (!form.login?.trim() || !form.nome?.trim()) { toast.error("Preencha nome e usuário."); return; }
+    if (modal === "create" && !form.senha?.trim()) { toast.error("A senha é obrigatória para novo usuário."); return; }
+    if (form.senha && form.senha.length < 6) { toast.error("A senha deve ter pelo menos 6 caracteres."); return; }
+    setSaving(true);
     try {
-      setLoading(true);
-      const res = await api.get("usuarios");
-      setUsers(res || {});
-    } catch (e) {
-      console.error("Failed to fetch user registers", e);
-    } finally {
-      setLoading(false);
-    }
+      if (modal === "create") await api.usuarios.create(form);
+      else if (modal === "edit" && target?.id) await api.usuarios.update(target.id, form);
+      toast.success(modal === "create" ? "Usuário criado com sucesso!" : "Usuário atualizado!");
+      setModal(null); load();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível salvar. Tente novamente.");
+    } finally { setSaving(false); }
   };
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const handleCreateUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg("");
-    setSuccessMsg("");
-
-    const name = newUsername.trim().toLowerCase();
-    const pass = newPassword;
-
-    if (!name || !pass) {
-      setErrorMsg("O nome de usuário e a senha são obrigatórios.");
-      return;
-    }
-
-    if (users[name]) {
-      setErrorMsg(`O login "${name}" já está registrado no sistema.`);
-      return;
-    }
-
+  const handleSenha = async () => {
+    if (!novaSenha.trim() || novaSenha.length < 6) { toast.error("A nova senha deve ter pelo menos 6 caracteres."); return; }
+    setSaving(true);
     try {
-      // Hashing is simulated safely server-side if it accepts simple parameters
-      const updated = { ...users };
-      updated[name] = {
-        username: name,
-        senha: pass, // The backend handles secure hashes natively!
-        role: newRole,
-        sector_permission: newSector,
-        status: "ATIVO",
-      };
-
-      await api.set("usuarios", updated);
-      setSuccessMsg(`Usuário/Login "${name}" cadastrado com sucesso!`);
-      setNewUsername("");
-      setNewPassword("");
-      loadData();
-    } catch (err: any) {
-      setErrorMsg(err.message || "Erro rede ao registrar login.");
-    }
+      await api.usuarios.resetSenha(target!.id!, novaSenha);
+      toast.success("Senha redefinida com sucesso!");
+      setModal(null);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível redefinir a senha.");
+    } finally { setSaving(false); }
   };
-
-  const handleTriggerBackup = async () => {
-    setErrorMsg("");
-    setSuccessMsg("");
-
-    try {
-      const dbAll = await api.get("backup_db");
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dbAll, null, 2));
-      const downloadAnchor = document.createElement("a");
-      downloadAnchor.setAttribute("href", dataStr);
-      downloadAnchor.setAttribute("download", `GEPLAN_Backup_Corporativo_${Date.now()}.json`);
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
-      downloadAnchor.remove();
-
-      setSuccessMsg("Cópia de segurança do banco de dados (JSON) baixada com sucesso!");
-    } catch (err: any) {
-      setErrorMsg("Falha ao gerar instantâneo do banco de dados.");
-    }
-  };
-
-  const handleRestoreBackup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg("");
-    setSuccessMsg("");
-
-    if (!uploadJson.trim()) {
-      setErrorMsg("Favor colar o conteúdo do JSON de backup para sincronia.");
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(uploadJson);
-      // Basic validations
-      if (!parsed.produtos || !parsed.usuarios) {
-        setErrorMsg("Conteúdo do arquivo inconsistente com o esquema GEPLAN.");
-        return;
-      }
-
-      await api.set("restore_db", parsed);
-      setSuccessMsg("Base de dados corporativa carregada e restaurada com êxito!");
-      setUploadJson("");
-      loadData();
-    } catch (err: any) {
-      setErrorMsg(`Falha de parser: ${err.message}`);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-[calc(100vh-120px)]">
-        <div className="animate-spin text-3xl">⚙️</div>
-        <span className="ml-3 font-semibold text-slate-500">Buscando central do usuários...</span>
-      </div>
-    );
-  }
-
-  const isCurrentAdmin = (localStorage.getItem("geplan_role") || "admin").toUpperCase() === "ADMIN";
 
   return (
-    <div className="space-y-6">
-      {successMsg && (
-        <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 text-sm font-bold rounded-xl animate-fade-in">
-          ✅ {successMsg}
-        </div>
-      )}
+    <>
+      <div className="space-y-6">
+        <PageHeader title="Usuários & Permissões" subtitle="Gestão de acesso ao sistema"
+          action={
+            <button onClick={openCreate} className="flex items-center gap-2 bg-gradient-to-r from-[#C75B12] to-[#EA6C0A] px-4 py-2 rounded-lg text-sm font-bold text-white shadow-lg shadow-orange-500/20 hover:-translate-y-0.5 transition-all">
+              <Plus size={16} /> Novo Usuário
+            </button>
+          }
+        />
 
-      {errorMsg && (
-        <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-700 text-sm font-bold rounded-xl animate-fade-in">
-          ⚠️ {errorMsg}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Left Side: Users list & registrations */}
-        <div className="bg-white border border-slate-100 rounded-xl p-5 shadow-sm space-y-4">
-          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider border-b border-slate-50 pb-2">
-            🔑 Controle de Usuários e Acessos
-          </h3>
-
-          {isCurrentAdmin ? (
-            <form onSubmit={handleCreateUser} className="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
-              <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">
-                ➕ Registrar Credencial no Sistema
-              </span>
-
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 block mb-1.5 uppercase tracking-widest">
-                  Login de Usuário *
-                </label>
-                <input
-                  type="text"
-                  value={newUsername}
-                  onChange={(e) => setNewUsername(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-semibold focus:outline-none focus:bg-white"
-                  placeholder="Ex: joao.almox"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 block mb-1.5 uppercase tracking-widest">
-                  Senha de Acesso *
-                </label>
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-semibold focus:outline-none focus:bg-white"
-                  placeholder="Senha forte"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 block mb-1.5 uppercase tracking-widest">
-                    Nível / Perfil
-                  </label>
-                  <select
-                    value={newRole}
-                    onChange={(e) => setNewRole(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-semibold focus:outline-none shadow-sm"
-                  >
-                    <option value="ADMIN">ADMIN (Diretor)</option>
-                    <option value="OPERADOR">OPERADOR (Almoxarife)</option>
-                    <option value="ENGENHARIA">ENGENHARIA (Controle)</option>
-                    <option value="COMPRAS">COMPRAS</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 block mb-1.5 uppercase tracking-widest">
-                    Padrão de Insumo
-                  </label>
-                  <select
-                    value={newSector}
-                    onChange={(e) => setNewSector(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-semibold focus:outline-none shadow-sm"
-                  >
-                    <option value="PEÇA LEVE">PEÇA LEVE</option>
-                    <option value="PEÇA PESADA">PEÇA PESADA</option>
-                    <option value="ROÇADA">ROÇADA</option>
-                    <option value="CONSUMO ADM">CONSUMO ADM</option>
-                  </select>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-2.5 bg-[#1e293b] hover:bg-[#0f172a] text-white text-xs font-bold rounded-lg cursor-pointer transition-all"
-              >
-                Cadastrar Acesso
-              </button>
-            </form>
+        <div className="bg-white border border-slate-100 rounded-xl shadow-sm overflow-hidden">
+          {loading ? (
+            <div className="p-10 text-center text-slate-400 text-sm">Carregando usuários...</div>
           ) : (
-            <div className="p-4 bg-amber-500/10 border border-amber-500/20 text-amber-800 text-xs rounded-xl">
-              ⚠️ A criação de novas credenciais está restrita ao cargo de Gerente/Direção (ADMIN).
-            </div>
-          )}
-
-          {/* User directory */}
-          <div className="space-y-2">
-            <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">
-              📋 Operadores Habilitados
-            </span>
-
-            <div className="overflow-x-auto text-[11px] max-h-60 overflow-y-auto">
-              <table className="w-full border-collapse text-left">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-100">
-                    <th className="p-2 font-semibold text-slate-500">Login</th>
-                    <th className="p-2 font-semibold text-slate-500">Perfil</th>
-                    <th className="p-2 font-semibold text-slate-500">Padrão Insumos</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-600">
-                  {Object.entries(users as Record<string, any>).map(([usr, u]) => (
-                    <tr key={usr}>
-                      <td className="p-2 font-black text-slate-700">{usr}</td>
-                      <td className="p-2">
-                        <span className="bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-[9px] font-bold">
-                          {u.role || "OPERADOR"}
-                        </span>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead><tr className="bg-slate-50 border-b border-slate-100">
+                  {["Usuário", "Nome", "Nível", "Setor", "Módulos", ""].map((h) => <th key={h} className="p-3 font-semibold text-slate-500">{h}</th>)}
+                </tr></thead>
+                <tbody className="divide-y divide-slate-50">
+                  {users.map((u) => (
+                    <tr key={u.login} className="hover:bg-slate-50/50">
+                      <td className="p-3 font-mono font-bold text-slate-700">{u.login}</td>
+                      <td className="p-3 font-semibold text-slate-800">{u.nome}</td>
+                      <td className="p-3"><span className={`px-2 py-1 rounded-full text-[10px] font-bold ${NIVEL_COLOR[u.nivel] ?? "bg-slate-100 text-slate-600"}`}>{u.nivel}</span></td>
+                      <td className="p-3 text-slate-500">{u.setor}</td>
+                      <td className="p-3 text-slate-400">{u.nivel === "ADMIN" ? "Todos" : `${(u.modulos ?? []).length} módulos`}</td>
+                      <td className="p-3 flex items-center gap-2">
+                        <button onClick={() => openEdit(u)} title="Editar" className="text-slate-400 hover:text-[#EA6C0A]"><Edit size={14} /></button>
+                        <button onClick={() => openSenha(u)} title="Redefinir senha" className="text-slate-400 hover:text-blue-500"><Lock size={14} /></button>
                       </td>
-                      <td className="p-2 font-semibold">{u.sector_permission || "PEÇA LEVE"}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              {users.length === 0 && <div className="p-10 text-center text-slate-400 text-sm">Nenhum usuário cadastrado.</div>}
             </div>
-          </div>
-        </div>
-
-        {/* Right Side: Backups & database restore */}
-        <div className="bg-white border border-slate-100 rounded-xl p-5 shadow-sm space-y-4">
-          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider border-b border-slate-50 pb-2">
-            💾 Cópia de Segurança / Backup Central
-          </h3>
-
-          <p className="text-xs text-slate-500 leading-normal">
-            Gere um instantâneo de segurança contendo todas as peças, equipes, retiradas de EPI, logs do KoboToolbox e registros de combustíveis. Arquivo exportado limpo para conformidade empresarial.
-          </p>
-
-          <button
-            onClick={handleTriggerBackup}
-            className="w-full py-4 bg-[#C75B12] hover:bg-[#EA6C0A] text-white text-sm font-black rounded-xl cursor-pointer shadow-md shadow-[#C75B12]/15"
-          >
-            📥 GERAR BACKUP COMPLETO DO BANCO (JSON)
-          </button>
-
-          {/* Restore Database Form */}
-          {isCurrentAdmin && (
-            <form onSubmit={handleRestoreBackup} className="space-y-3 pt-4 border-t border-slate-100">
-              <span className="text-xs font-bold text-red-500 uppercase tracking-wide block">
-                🚨 Carregar / Restaurar Backup Externo
-              </span>
-
-              <p className="text-[10px] text-slate-400 leading-normal">
-                Cole o conteúdo bruto do arquivo JSON de backup exportado anteriormente abaixo. Isto substituirá os dados atuais do geplan_db.
-              </p>
-
-              <textarea
-                value={uploadJson}
-                onChange={(e) => setUploadJson(e.target.value)}
-                rows={5}
-                className="w-full bg-slate-900 text-emerald-400 font-mono text-[10px] p-3 rounded-lg border-none focus:outline-none"
-                placeholder='Colar arquivo JSON aqui...'
-              />
-
-              <button
-                type="submit"
-                className="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg cursor-pointer"
-              >
-                ⚠️ Confirmar e Sincronizar Backup Integrado
-              </button>
-            </form>
           )}
         </div>
       </div>
-    </div>
+
+      {/* Create / Edit modal */}
+      <Modal isOpen={modal === "create" || modal === "edit"} onClose={() => setModal(null)} title={modal === "create" ? "Novo Usuário" : "Editar Usuário"} size="lg">
+        <div className="space-y-4 text-sm">
+          <div className="grid grid-cols-2 gap-4">
+            {[
+              { label: "Login *", field: "login", placeholder: "usuário.sobrenome" },
+              { label: "Nome Completo *", field: "nome", placeholder: "Nome como exibido" },
+            ].map((f) => (
+              <div key={f.field}>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">{f.label}</label>
+                <input value={String(form[f.field as keyof typeof form] ?? "")} onChange={(e) => setForm((p) => ({ ...p, [f.field]: e.target.value }))} placeholder={f.placeholder}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-[#EA6C0A]" />
+              </div>
+            ))}
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Setor</label>
+              <select value={String(form.setor ?? "")} onChange={(e) => setForm((p) => ({ ...p, setor: e.target.value }))}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-[#EA6C0A]">
+                {SETORES.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Nível</label>
+              <select value={String(form.nivel ?? "")} onChange={(e) => setForm((p) => ({ ...p, nivel: e.target.value }))}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-[#EA6C0A]">
+                {NIVEIS.map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </div>
+            {modal === "create" && (
+              <div className="col-span-2">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Senha *</label>
+                <input type="password" value={form.senha ?? ""} onChange={(e) => setForm((p) => ({ ...p, senha: e.target.value }))} placeholder="Mín. 6 caracteres"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-[#EA6C0A]" />
+              </div>
+            )}
+          </div>
+
+          {form.nivel !== "ADMIN" && (
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-2">Módulos Permitidos</label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {MODULOS_ALL.map((m) => {
+                  const checked = (form.modulos ?? []).includes(m);
+                  return (
+                    <label key={m} className={`flex items-center gap-2 cursor-pointer px-2 py-1.5 rounded-lg border text-xs transition-colors ${checked ? "bg-[#EA6C0A]/10 border-[#EA6C0A]/30 text-[#C75B12] font-semibold" : "bg-slate-50 border-slate-200 text-slate-500"}`}>
+                      <input type="checkbox" checked={checked} onChange={() => toggleModulo(m)} className="hidden" />
+                      <span className={`w-3 h-3 rounded border flex items-center justify-center ${checked ? "bg-[#EA6C0A] border-[#EA6C0A]" : "border-slate-300"}`}>
+                        {checked && <span className="text-white text-[8px] font-bold">✓</span>}
+                      </span>
+                      {m}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button onClick={() => setModal(null)} className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors">Cancelar</button>
+            <button onClick={handleSave} disabled={saving}
+              className={`px-6 py-2 text-xs font-bold text-white rounded-lg transition-all ${saving ? "bg-slate-400 cursor-not-allowed" : "bg-gradient-to-r from-[#C75B12] to-[#EA6C0A] hover:-translate-y-0.5"}`}>
+              {saving ? "Salvando..." : "Salvar"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Reset password modal */}
+      <Modal isOpen={modal === "senha"} onClose={() => setModal(null)} title={`Redefinir Senha — ${target?.nome}`} size="sm">
+        <div className="space-y-4">
+          <div>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Nova Senha</label>
+            <input type="password" value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} placeholder="Mín. 6 caracteres"
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-[#EA6C0A]" />
+          </div>
+          <div className="flex justify-end gap-3">
+            <button onClick={() => setModal(null)} className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors">Cancelar</button>
+            <button onClick={handleSenha} disabled={saving}
+              className={`px-6 py-2 text-xs font-bold text-white rounded-lg transition-all ${saving ? "bg-slate-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"}`}>
+              {saving ? "Salvando..." : "Redefinir Senha"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <ToastContainer toasts={toast.toasts} onDismiss={toast.dismiss} />
+    </>
   );
 }

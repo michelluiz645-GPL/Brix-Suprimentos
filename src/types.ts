@@ -1,18 +1,29 @@
 export enum UserLevel {
-  ADMIN = "ADMIN",
+  ADMIN    = "ADMIN",
   OPERADOR = "OPERADOR",
 }
 
+export type Setor = "ALMOXARIFADO" | "ENGENHARIA" | "MANUTENCAO";
+
 export interface User {
+  id?: number;
   login: string;
   nome: string;
   nivel: UserLevel | string;
-  setor: "ALMOXARIFADO" | "ENGENHARIA" | "MANUTENCAO" | string;
+  setor: Setor | string;
   modulos: string[];
   senha?: string;
 }
 
+export interface AuthState {
+  user: User | null;
+  token: string | null;
+  setor: Setor | string;
+}
+
 export interface Product {
+  id?: number;
+  codigo_produto: string;
   nome: string;
   categoria: string;
   unid: string;
@@ -20,14 +31,15 @@ export interface Product {
   estoque: number;
   estoque_min: number;
   estoque_max: number;
-  codigo_produto: string; // Internal product code
   armario: string;
   prateleira: string;
-  dias_validade_epi: number;
+  dias_validade_epi?: number;
+  status?: "ATIVO" | "INATIVO";
 }
 
 export interface Movement {
-  tipo: "ENTRADA" | "SAÍDA" | "DEVOLUÇÃO" | string;
+  id?: number;
+  tipo: "ENTRADA" | "SAÍDA" | "DEVOLUÇÃO" | "AJUSTE" | string;
   numero_nf?: string;
   numero_pedido?: string;
   codigo: string;
@@ -36,7 +48,6 @@ export interface Movement {
   qtd: number;
   preco: number;
   fornecedor?: string;
-  nf?: string;
   obs?: string;
   almoxarifado: string;
   responsavel?: string;
@@ -55,35 +66,38 @@ export interface Movement {
 }
 
 export interface Employee {
+  id?: number;
   nome: string;
   funcao: string;
   equipe_num: string;
   cpf?: string;
   tel?: string;
-  status: string;
+  status: "ATIVO" | "INATIVO" | string;
   demitido: boolean;
 }
 
 export interface Team {
+  id?: number;
   nome: string;
+  numero: string;
   responsavel?: string;
   veiculo?: string;
   tipo?: string;
 }
 
-export type Crew = Team;
-
 export interface Vehicle {
+  id?: number;
   placa: string;
   modelo: string;
   tipo: string;
   equipe?: string;
   ano?: string;
-  status: string;
+  status: "ATIVO" | "INATIVO" | string;
 }
 
 export interface FuelMovement {
-  tipo: "ENTRADA" | "SAÍDA" | "ABASTECIMENTO EXTERNO" | string;
+  id?: number;
+  tipo: "ENTRADA" | "ABASTECIMENTO" | string;
   combustivel: string;
   quantidade: number;
   valor: number;
@@ -109,6 +123,7 @@ export interface DeliveryItem {
 }
 
 export interface Delivery {
+  id?: number;
   numero_pedido: string;
   equipe: string;
   nome_equipe: string;
@@ -124,7 +139,8 @@ export interface Delivery {
   confirmado_por?: string;
 }
 
-export interface EpiExpiry {
+export interface EpiRecord {
+  id?: number;
   funcionario: string;
   epi: string;
   data_entrega: string;
@@ -135,6 +151,7 @@ export interface EpiExpiry {
 }
 
 export interface Supplier {
+  id?: number;
   nome: string;
   cnpj?: string;
   tel?: string;
@@ -143,49 +160,9 @@ export interface Supplier {
   cidade?: string;
   estado?: string;
   obs?: string;
-  status: string;
+  status: "ATIVO" | "INATIVO" | string;
   criado_em?: string;
   criado_por?: string;
-}
-
-export interface SCItext {
-  nome: string;
-  qtd: string;
-  unidade: string;
-  fabricante?: string;
-  part_number?: string;
-  aplicacao?: string;
-  foto_url?: string | null;
-  data_item?: string;
-  ultimo_preco?: number;
-  ultimo_fornecedor?: string;
-  ultima_compra?: string;
-  valor_estimado?: number;
-}
-
-export interface EngineeringSC {
-  id: string;
-  num_sc: string;
-  data_pedido: string;
-  data_desejada: string;
-  solicitante: string;
-  funcao?: string;
-  setor_origem: string;
-  obra?: string;
-  centro_custo?: string;
-  tipo_sc: string;
-  urgencia: string;
-  local_entrega?: string;
-  ponto_ref?: string;
-  horario?: string;
-  os?: string;
-  motivo_geral: string;
-  itens: SCItext[];
-  status: "PENDENTE APROVAÇÃO" | "APROVADA" | "REJEITADA" | "CONCLUÍDA" | string;
-  obs_aprovacao?: string;
-  aprovado_por?: string;
-  data_aprovacao?: string;
-  sc_b64?: string;
 }
 
 export interface PCItem {
@@ -197,8 +174,8 @@ export interface PCItem {
   data_entrega?: string;
 }
 
-export interface EngineeringPC {
-  id: string;
+export interface PurchaseOrder {
+  id?: number;
   num_pc: string;
   data_pedido: string;
   solicitante: string;
@@ -219,37 +196,35 @@ export interface EngineeringPC {
   desconto_total: number;
   itens: PCItem[];
   status: "PENDENTE" | "APROVADO" | "CONCLUÍDO" | "CANCELADO" | string;
-  pc_b64?: string;
 }
 
 export interface Project {
-  id: string;
+  id?: number;
   setor: string;
   nome: string;
+  tipo?: "PUBLICA" | "PRIVADA" | string;
   descricao?: string;
   responsavel?: string;
   data_inicio?: string;
   data_prev?: string;
+  centro_custo?: string;
   status: "ATIVA" | "CONCLUÍDA" | "SUSPENSA" | string;
   criado_em?: string;
   criado_por?: string;
 }
 
-export interface MaintenanceDebitItem {
+export interface Equipment {
+  id?: number;
   nome: string;
-  qtd: number;
-  unid: string;
-  preco: number;
-  colaborador_epi?: string;
-  destino?: string;
-  destino_frota?: string;
-  epi_vencimento?: string;
-  categoria?: string;
-  frota?: string;
-  categoria_debito?: string;
+  tipo: string;
+  serie?: string;
+  equipe?: string;
+  obs?: string;
+  status: "ATIVO" | "INATIVO" | string;
 }
 
 export interface MaintenanceDebit {
+  id?: number;
   numero: string;
   pedido_origem: string;
   data: string;
@@ -257,50 +232,23 @@ export interface MaintenanceDebit {
   nome_equipe: string;
   colaborador: string;
   almoxarifado: string;
-  itens: MaintenanceDebitItem[];
+  itens: DeliveryItem[];
   total: number;
   status: "ABERTO" | "PAGO" | string;
   registrado_por: string;
   data_pagamento?: string;
 }
 
-export interface Equipment {
-  nome: string;
-  tipo: string;
-  serie?: string;
-  equipe?: string;
-  obs?: string;
-  status: string;
+export interface ApiResponse<T = unknown> {
+  data: T;
+  message?: string;
+  errors?: Record<string, string[]>;
 }
 
-export interface EquipmentMovement {
-  data: string;
-  equipamento: string;
-  tipo: string;
-  responsavel: string;
-  obs?: string;
-}
-
-export interface MaterialObra {
-  codigo: string;
-  nome: string;
-  categoria: string;
-  unidade: string;
-  norma?: string;
-  especificacao?: string;
-  obs?: string;
-  status: "ATIVO" | "INATIVO" | string;
-  criado_em?: string;
-  criado_por?: string;
-}
-
-export interface SlipHistory {
-  numero: string;
-  data: string;
-  equipe: string;
-  nome_equipe: string;
-  colaborador: string;
-  total: string;
-  itens: number;
-  cupom_b64: string;
+export interface PaginatedResponse<T = unknown> {
+  data: T[];
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
 }

@@ -1,73 +1,157 @@
-export const API_URL = "";
+const BASE_URL = import.meta.env.VITE_API_URL ?? "/api";
 
-async function request(url: string, options: RequestInit = {}) {
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  });
+function getToken(): string | null {
+  return localStorage.getItem("geplan_token");
+}
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    let errorJson;
+async function request<T = unknown>(
+  path: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const token = getToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(options.headers as Record<string, string>),
+  };
+
+  const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+
+  if (!res.ok) {
+    let message = `Erro ${res.status}`;
     try {
-      errorJson = JSON.parse(errorText);
-    } catch {
-      // Not JSON
-    }
-    throw new Error(errorJson?.message || errorJson?.error || errorText || `HTTP error ${response.status}`);
+      const body = await res.json();
+      message = body.message || body.error || message;
+    } catch { /* not json */ }
+    throw new Error(message);
   }
 
-  return response.json();
+  if (res.status === 204) return {} as T;
+  return res.json() as Promise<T>;
 }
 
 export const api = {
-  // Read Key from DB
-  async get(key: string): Promise<any> {
-    return request(`/api/db/get/${encodeURIComponent(key)}`);
+  auth: {
+    login: (login: string, senha: string) =>
+      request<{ token: string; user: object }>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ login, senha }),
+      }),
+    logout: () => request("/auth/logout", { method: "POST" }),
+    me: () => request<{ user: object }>("/auth/me"),
   },
 
-  // Set Key in DB
-  async set(key: string, data: any): Promise<{ success: boolean; cloudSynced: boolean }> {
-    return request(`/api/db/set/${encodeURIComponent(key)}`, {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
+  produtos: {
+    list: (params?: string) => request<object>(`/produtos${params ? `?${params}` : ""}`),
+    get: (id: number)        => request<object>(`/produtos/${id}`),
+    create: (data: object)   => request<object>("/produtos", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: object) => request<object>(`/produtos/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    delete: (id: number)     => request(`/produtos/${id}`, { method: "DELETE" }),
   },
 
-  // Auth login
-  async login(login: string, senha: string): Promise<{ success: boolean; user: any }> {
-    return request("/api/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ login, senha }),
-    });
+  movimentos: {
+    list: (params?: string)  => request<object>(`/movimentos${params ? `?${params}` : ""}`),
+    create: (data: object)   => request<object>("/movimentos", { method: "POST", body: JSON.stringify(data) }),
   },
 
-  // Kobo Toolbox Suprimentos
-  async getKoboSuprimentos(): Promise<{ success: boolean; results: any[] }> {
-    return request("/api/kobo/suprimentos");
+  saidas: {
+    create: (data: object)   => request<object>("/saidas", { method: "POST", body: JSON.stringify(data) }),
+    cupons: (params?: string) => request<object>(`/saidas/cupons${params ? `?${params}` : ""}`),
   },
 
-  // Kobo Toolbox Compras/Pedidos
-  async getKoboCompras(): Promise<{ success: boolean; results: any[] }> {
-    return request("/api/kobo/compras");
+  devolucoes: {
+    create: (data: object)   => request<object>("/devolucoes", { method: "POST", body: JSON.stringify(data) }),
   },
 
-  // Clear/Reset DB Sync status
-  async syncAll(): Promise<{ success: boolean; total: number; synced: number; errors: string[] }> {
-    return request("/api/db/sync-all", { method: "POST" });
+  entregas: {
+    list: (params?: string)  => request<object>(`/entregas${params ? `?${params}` : ""}`),
+    confirm: (id: number, data: object) => request<object>(`/entregas/${id}/confirmar`, { method: "POST", body: JSON.stringify(data) }),
   },
 
-  // Check Supabase connection status
-  async getStatus(): Promise<{ connected: boolean; message: string }> {
-    return request("/api/db/status");
+  combustiveis: {
+    list: (params?: string)  => request<object>(`/combustiveis${params ? `?${params}` : ""}`),
+    create: (data: object)   => request<object>("/combustiveis", { method: "POST", body: JSON.stringify(data) }),
+    saldo: ()                => request<object>("/combustiveis/saldo"),
   },
 
-  // Backup download link
-  getBackupDownloadUrl(): string {
-    return "/api/db/download-backup";
-  }
+  funcionarios: {
+    list: (params?: string)  => request<object>(`/funcionarios${params ? `?${params}` : ""}`),
+    get: (id: number)        => request<object>(`/funcionarios/${id}`),
+    create: (data: object)   => request<object>("/funcionarios", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: object) => request<object>(`/funcionarios/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  },
+
+  equipes: {
+    list: ()                 => request<object>("/equipes"),
+    create: (data: object)   => request<object>("/equipes", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: object) => request<object>(`/equipes/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  },
+
+  veiculos: {
+    list: ()                 => request<object>("/veiculos"),
+    create: (data: object)   => request<object>("/veiculos", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: object) => request<object>(`/veiculos/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  },
+
+  obras: {
+    list: (params?: string)  => request<object>(`/obras${params ? `?${params}` : ""}`),
+    get: (id: number)        => request<object>(`/obras/${id}`),
+    create: (data: object)   => request<object>("/obras", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: object) => request<object>(`/obras/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  },
+
+  fornecedores: {
+    list: (params?: string)  => request<object>(`/fornecedores${params ? `?${params}` : ""}`),
+    create: (data: object)   => request<object>("/fornecedores", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: object) => request<object>(`/fornecedores/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  },
+
+  pedidosCompra: {
+    list: (params?: string)  => request<object>(`/pedidos-compra${params ? `?${params}` : ""}`),
+    get: (id: number)        => request<object>(`/pedidos-compra/${id}`),
+    create: (data: object)   => request<object>("/pedidos-compra", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: object) => request<object>(`/pedidos-compra/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    updateStatus: (id: number, status: string) =>
+      request<object>(`/pedidos-compra/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
+  },
+
+  epi: {
+    list: (params?: string)  => request<object>(`/epi${params ? `?${params}` : ""}`),
+    create: (data: object)   => request<object>("/epi", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: object) => request<object>(`/epi/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  },
+
+  equipamentos: {
+    list: ()                 => request<object>("/equipamentos"),
+    create: (data: object)   => request<object>("/equipamentos", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: object) => request<object>(`/equipamentos/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  },
+
+  debitos: {
+    list: (params?: string)  => request<object>(`/debitos${params ? `?${params}` : ""}`),
+    create: (data: object)   => request<object>("/debitos", { method: "POST", body: JSON.stringify(data) }),
+    pagar: (id: number)      => request<object>(`/debitos/${id}/pagar`, { method: "PATCH" }),
+  },
+
+  usuarios: {
+    list: ()                 => request<object>("/usuarios"),
+    create: (data: object)   => request<object>("/usuarios", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: object) => request<object>(`/usuarios/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    resetSenha: (id: number, senha: string) =>
+      request<object>(`/usuarios/${id}/senha`, { method: "PATCH", body: JSON.stringify({ senha }) }),
+  },
+
+  kobo: {
+    suprimentos: () => request<object>("/kobo/suprimentos"),
+    compras: ()     => request<object>("/kobo/compras"),
+  },
+
+  sistema: {
+    status: ()    => request<{ connected: boolean; message: string }>("/sistema/status"),
+    backup: ()    => request<object>("/sistema/backup"),
+    syncAll: ()   => request<object>("/sistema/sync", { method: "POST" }),
+  },
 };
+
 export default api;
