@@ -37,11 +37,11 @@ const hashSenha = (s: string) => crypto.createHash("sha256").update(s).digest("h
 const DEFAULT_USERS: Record<string, any> = {
   admin: {
     nome: "Administrador",
-    login: "admin",
+    login: "admin@admin.com",
     nivel: "ADMIN",
     setor: "ALMOXARIFADO",
     modulos: [],
-    senha: hashSenha("admin123")
+    senha: hashSenha("123456")
   }
 };
 
