@@ -40,9 +40,15 @@ export default function Saida() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!equipe.trim())     { toast.error("Campo obrigatório: Equipe / Destinatário."); return; }
+    if (!entregador.trim()) { toast.error("Campo obrigatório: Entregador."); return; }
+    if (!respAlmox.trim())  { toast.error("Campo obrigatório: Resp. Almoxarifado."); return; }
+    if (!almox.trim())      { toast.error("Campo obrigatório: Almoxarifado."); return; }
+    if (!data)              { toast.error("Campo obrigatório: Data."); return; }
+    if (itens.some((i) => !i.codigo))   { toast.error("Todos os itens precisam ter um produto selecionado."); return; }
+    if (itens.some((i) => i.qtd <= 0))  { toast.error("Todos os itens precisam ter quantidade maior que zero."); return; }
     const over = itens.find((it) => it.estoque_disponivel !== undefined && it.qtd > it.estoque_disponivel);
     if (over) { toast.error(`"${over.nome}" — quantidade solicitada (${over.qtd}) maior que o estoque disponível (${over.estoque_disponivel}).`); return; }
-    if (itens.some((i) => !i.codigo || i.qtd <= 0)) { toast.error("Todos os itens precisam de produto e quantidade."); return; }
     setLoading(true);
     try {
       const res = await api.saidas.create({ tipo: "SAÍDA", equipe, colaborador, entregador, resp_almox: respAlmox, almoxarifado: almox, data, itens }) as { data: { numero_pedido: string } };
@@ -63,11 +69,11 @@ export default function Saida() {
           <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-4">Dados da Saída</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[
-              { label: "Equipe / Destinatário", value: equipe, set: setEquipe, placeholder: "Ex: Equipe 01" },
+              { label: "Equipe / Destinatário *", value: equipe, set: setEquipe, placeholder: "Ex: Equipe 01" },
               { label: "Colaborador", value: colaborador, set: setColab, placeholder: "Nome do colaborador" },
-              { label: "Entregador", value: entregador, set: setEntreg, placeholder: "Quem entregou" },
-              { label: "Resp. Almoxarifado", value: respAlmox, set: setResp, placeholder: "Almoxarife responsável" },
-              { label: "Almoxarifado", value: almox, set: setAlmox, placeholder: "Ex: Almox Central" },
+              { label: "Entregador *", value: entregador, set: setEntreg, placeholder: "Quem entregou" },
+              { label: "Resp. Almoxarifado *", value: respAlmox, set: setResp, placeholder: "Almoxarife responsável" },
+              { label: "Almoxarifado *", value: almox, set: setAlmox, placeholder: "Ex: Almox Central" },
             ].map((f) => (
               <div key={f.label}>
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">{f.label}</label>

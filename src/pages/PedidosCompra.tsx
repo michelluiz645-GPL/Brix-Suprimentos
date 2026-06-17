@@ -52,8 +52,17 @@ export default function PedidosCompra() {
     setForm((p) => ({ ...p, itens: (p.itens ?? []).map((it, i) => i === idx ? { ...it, [field]: value } : it) }));
 
   const handleSave = async () => {
-    if (!form.forn_nome?.trim()) { toast.error("Informe o nome do fornecedor."); return; }
-    if (!(form.itens ?? []).length) { toast.error("Adicione pelo menos um item."); return; }
+    if (!form.solicitante?.trim())   { toast.error("Campo obrigatório: Solicitante."); return; }
+    if (!form.setor_origem?.trim())  { toast.error("Campo obrigatório: Setor Origem."); return; }
+    if (!form.forn_nome?.trim())     { toast.error("Campo obrigatório: Fornecedor."); return; }
+    if (!form.obra?.trim())          { toast.error("Campo obrigatório: Obra / Centro de Custo."); return; }
+    if (!form.local_entrega?.trim()) { toast.error("Campo obrigatório: Local de Entrega."); return; }
+    if (!form.data_desejada)         { toast.error("Campo obrigatório: Data Desejada."); return; }
+    if (!form.cond_pagamento?.trim()) { toast.error("Campo obrigatório: Condição de Pagamento."); return; }
+    if (!(form.itens ?? []).length)  { toast.error("Adicione pelo menos um item."); return; }
+    if ((form.itens ?? []).some((i) => !i.nome?.trim())) { toast.error("Todos os itens precisam ter nome/descrição."); return; }
+    if ((form.itens ?? []).some((i) => Number(i.qtd) <= 0)) { toast.error("Todos os itens precisam ter quantidade maior que zero."); return; }
+    if ((form.itens ?? []).some((i) => !i.unidade?.trim())) { toast.error("Todos os itens precisam ter unidade de medida."); return; }
     setSaving(true);
     try {
       await api.pedidosCompra.create(form);
@@ -155,14 +164,14 @@ export default function PedidosCompra() {
         <div className="space-y-5 text-sm">
           <div className="grid grid-cols-2 gap-4">
             {[
-              { label: "Solicitante", field: "solicitante" as keyof PurchaseOrder, placeholder: "Nome do solicitante" },
-              { label: "Setor Origem", field: "setor_origem" as keyof PurchaseOrder, placeholder: "Ex: Engenharia" },
+              { label: "Solicitante *", field: "solicitante" as keyof PurchaseOrder, placeholder: "Nome do solicitante" },
+              { label: "Setor Origem *", field: "setor_origem" as keyof PurchaseOrder, placeholder: "Ex: Engenharia" },
               { label: "Fornecedor *", field: "forn_nome" as keyof PurchaseOrder, placeholder: "Razão social" },
               { label: "CNPJ Fornecedor", field: "forn_cnpj" as keyof PurchaseOrder, placeholder: "00.000.000/0001-00" },
-              { label: "Obra / Centro de Custo", field: "obra" as keyof PurchaseOrder, placeholder: "Nome da obra" },
-              { label: "Local de Entrega", field: "local_entrega" as keyof PurchaseOrder, placeholder: "Endereço ou referência" },
-              { label: "Data Desejada", field: "data_desejada" as keyof PurchaseOrder, placeholder: "", type: "date" },
-              { label: "Cond. Pagamento", field: "cond_pagamento" as keyof PurchaseOrder, placeholder: "Ex: 30 dias" },
+              { label: "Obra / Centro de Custo *", field: "obra" as keyof PurchaseOrder, placeholder: "Nome da obra" },
+              { label: "Local de Entrega *", field: "local_entrega" as keyof PurchaseOrder, placeholder: "Endereço ou referência" },
+              { label: "Data Desejada *", field: "data_desejada" as keyof PurchaseOrder, placeholder: "", type: "date" },
+              { label: "Cond. Pagamento *", field: "cond_pagamento" as keyof PurchaseOrder, placeholder: "Ex: 30 dias" },
             ].map((f) => (
               <div key={String(f.field)}>
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">{f.label}</label>

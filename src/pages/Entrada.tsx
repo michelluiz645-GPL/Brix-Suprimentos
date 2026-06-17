@@ -43,8 +43,13 @@ export default function Entrada() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!numeroNf.trim()) { toast.error("Informe o número da nota fiscal."); return; }
-    if (itens.some((i) => !i.codigo || i.qtd <= 0)) { toast.error("Todos os itens precisam de código e quantidade válida."); return; }
+    if (!numeroNf.trim())       { toast.error("Campo obrigatório: Número da NF."); return; }
+    if (!fornecedor.trim())     { toast.error("Campo obrigatório: Fornecedor."); return; }
+    if (!almoxarifado.trim())   { toast.error("Campo obrigatório: Almoxarifado."); return; }
+    if (!responsavel.trim())    { toast.error("Campo obrigatório: Responsável."); return; }
+    if (!data)                  { toast.error("Campo obrigatório: Data de recebimento."); return; }
+    if (itens.some((i) => !i.codigo)) { toast.error("Todos os itens precisam ter um produto selecionado."); return; }
+    if (itens.some((i) => i.qtd <= 0)) { toast.error("Todos os itens precisam ter quantidade maior que zero."); return; }
     setLoading(true);
     try {
       const res = await api.movimentos.create({ tipo: "ENTRADA", numero_nf: numeroNf, data, fornecedor, almoxarifado, responsavel, itens }) as { data: { numero_pedido: string } };
@@ -69,9 +74,9 @@ export default function Entrada() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[
               { label: "Número da NF *", value: numeroNf, set: setNumeroNf, placeholder: "Ex: 000123" },
-              { label: "Fornecedor",      value: fornecedor, set: setFornecedor, placeholder: "Nome do fornecedor" },
-              { label: "Almoxarifado",    value: almoxarifado, set: setAlmoxarifado, placeholder: "Ex: Almox Central" },
-              { label: "Responsável",     value: responsavel, set: setResponsavel, placeholder: "Responsável pelo recebimento" },
+              { label: "Fornecedor *",    value: fornecedor, set: setFornecedor, placeholder: "Nome do fornecedor" },
+              { label: "Almoxarifado *",  value: almoxarifado, set: setAlmoxarifado, placeholder: "Ex: Almox Central" },
+              { label: "Responsável *",   value: responsavel, set: setResponsavel, placeholder: "Responsável pelo recebimento" },
             ].map((f) => (
               <div key={f.label}>
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">{f.label}</label>
