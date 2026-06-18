@@ -43,11 +43,11 @@ export const api = {
   },
 
   produtos: {
-    list: (params?: string) => request<object>(`/produtos${params ? `?${params}` : ""}`),
-    get: (id: number)        => request<object>(`/produtos/${id}`),
-    create: (data: object)   => request<object>("/produtos", { method: "POST", body: JSON.stringify(data) }),
-    update: (id: number, data: object) => request<object>(`/produtos/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-    delete: (id: number)     => request(`/produtos/${id}`, { method: "DELETE" }),
+    list: (params?: string)          => request<object>(`/produtos${params ? `?${params}` : ""}`),
+    get: (id: string)                => request<object>(`/produtos/${id}`),
+    create: (data: object)           => request<object>("/produtos", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: string, data: object) => request<object>(`/produtos/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    delete: (id: string)             => request(`/produtos/${id}`, { method: "DELETE" }),
   },
 
   movimentos: {

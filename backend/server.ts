@@ -397,7 +397,44 @@ app.get("/api/db/download-backup", authenticate, (req, res) => {
   }
 });
 
-// Bootstrap server
+// ── PRODUTOS ─────────────────────────────────────────────────────────────────
+
+app.get("/api/produtos", authenticate, async (req, res) => {
+  const cloud = await supaGet("produtos");
+  const local = localRead();
+  const prods: Record<string, any> = cloud || local.produtos || {};
+  if (cloud) { local.produtos = cloud; localWrite(local); }
+  const lista = Object.entries(prods).map(([id, p]) => ({
+    ...(p as any),
+    codigo_produto: (p as any).codigo_produto || id,
+  }));
+  res.json({ data: lista });
+});
+
+app.post("/api/produtos", authenticate, async (req, res) => {
+  const produto = req.body;
+  const id: string = (produto.codigo_produto ?? "").trim();
+  if (!id) return res.status(400).json({ message: "Código do produto é obrigatório." });
+  const local = localRead();
+  if (!local.produtos) local.produtos = {};
+  if (local.produtos[id]) return res.status(409).json({ message: "Já existe um produto com este código." });
+  local.produtos[id] = { ...produto, codigo_produto: id };
+  localWrite(local);
+  await supaSet("produtos", local.produtos);
+  res.json({ data: local.produtos[id], message: "Produto cadastrado com sucesso." });
+});
+
+app.put("/api/produtos/:id", authenticate, async (req, res) => {
+  const { id } = req.params;
+  const local = localRead();
+  if (!local.produtos?.[id]) return res.status(404).json({ message: "Produto não encontrado." });
+  local.produtos[id] = { ...local.produtos[id], ...req.body, codigo_produto: id };
+  localWrite(local);
+  await supaSet("produtos", local.produtos);
+  res.json({ data: local.produtos[id], message: "Produto atualizado com sucesso." });
+});
+
+// ── Bootstrap server
 async function startServer() {
   // Mount Vite or static server
   if (process.env.NODE_ENV !== "production") {
