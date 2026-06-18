@@ -33,6 +33,35 @@ if (!fs.existsSync(DB_DIR)) {
 // Helpers
 const hashSenha = (s: string) => crypto.createHash("sha256").update(s).digest("hex");
 
+// ── SESSÕES & RATE LIMIT ──────────────────────────────────────────────────────
+
+const TOKEN_TTL    = 8 * 60 * 60 * 1000;  // 8 horas
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_TTL  = 15 * 60 * 1000;      // 15 minutos
+
+interface Session { login: string; nome: string; nivel: string; setor: string; modulos: string[]; expires: number; }
+const sessions = new Map<string, Session>();
+const loginAttempts = new Map<string, { count: number; resetAt: number }>();
+
+function generateToken(): string {
+  return crypto.randomBytes(32).toString("hex");
+}
+
+function authenticate(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const header = req.headers.authorization;
+  if (!header?.startsWith("Bearer ")) {
+    return res.status(401).json({ success: false, message: "Acesso não autorizado. Faça login para continuar." });
+  }
+  const token = header.slice(7);
+  const session = sessions.get(token);
+  if (!session || session.expires < Date.now()) {
+    sessions.delete(token);
+    return res.status(401).json({ success: false, message: "Sessão expirada. Faça login novamente." });
+  }
+  (req as any).currentUser = session;
+  next();
+}
+
 // Default Database Structure
 const DEFAULT_USERS: Record<string, any> = {
   admin: {
@@ -163,7 +192,7 @@ async function supaSet(key: string, data: any): Promise<boolean> {
 // ── API ROUTES ──
 
 // Database read (GET key)
-app.get("/api/db/get/:key", async (req, res) => {
+app.get("/api/db/get/:key", authenticate, async (req, res) => {
   const { key } = req.params;
   
   // 1. Try Supabase Cloud DB
@@ -183,7 +212,7 @@ app.get("/api/db/get/:key", async (req, res) => {
 });
 
 // Database save (POST key)
-app.post("/api/db/set/:key", async (req, res) => {
+app.post("/api/db/set/:key", authenticate, async (req, res) => {
   const { key } = req.params;
   const dados = req.body;
 
@@ -198,7 +227,7 @@ app.post("/api/db/set/:key", async (req, res) => {
 });
 
 // Sync SQLite storage to Supabase
-app.post("/api/db/sync-all", async (req, res) => {
+app.post("/api/db/sync-all", authenticate, async (req, res) => {
   if (!SUPABASE_KEY || !SUPABASE_URL) {
     return res.status(400).json({ success: false, error: "Supabase connection keys are not configured in your .env secrets." });
   }
@@ -218,7 +247,7 @@ app.post("/api/db/sync-all", async (req, res) => {
 });
 
 // Checking Supabase connections status
-app.get("/api/db/status", async (req, res) => {
+app.get("/api/db/status", authenticate, async (req, res) => {
   if (!SUPABASE_KEY || !SUPABASE_URL) {
     return res.json({ connected: false, message: "Credentials missing. Configure SUPABASE_KEY & SUPABASE_URL in Secrets panel." });
   }
@@ -243,31 +272,68 @@ app.get("/api/db/status", async (req, res) => {
 app.post("/api/auth/login", async (req, res) => {
   const { login, senha } = req.body;
   if (!login || !senha) {
-    return res.status(400).json({ success: false, message: "Username and password are required" });
+    return res.status(400).json({ success: false, message: "Usuário e senha são obrigatórios." });
+  }
+
+  // Rate limiting por IP
+  const ip = req.ip ?? "unknown";
+  const now = Date.now();
+  const attempt = loginAttempts.get(ip) ?? { count: 0, resetAt: now + LOCKOUT_TTL };
+  if (now > attempt.resetAt) { attempt.count = 0; attempt.resetAt = now + LOCKOUT_TTL; }
+  if (attempt.count >= MAX_ATTEMPTS) {
+    const wait = Math.ceil((attempt.resetAt - now) / 60000);
+    return res.status(429).json({ success: false, message: `Muitas tentativas. Aguarde ${wait} minuto(s).` });
   }
 
   const usuarios = await supaGet("usuarios") || localRead().usuarios || {};
   const hash_s = hashSenha(senha);
 
-  let mappedUser = null;
+  let mappedUser: Record<string, any> | null = null;
   for (const uid in usuarios) {
     const u = usuarios[uid];
     if (u.login?.toLowerCase() === login.toLowerCase() && u.senha === hash_s) {
-      mappedUser = { ...u };
-      delete mappedUser.senha; // hide password hash from client
+      const copy: Record<string, any> = { ...u };
+      delete copy.senha;
+      mappedUser = copy;
       break;
     }
   }
 
-  if (mappedUser) {
-    res.json({ success: true, user: mappedUser });
-  } else {
-    res.status(401).json({ success: false, message: "Invalid username or password" });
+  if (!mappedUser) {
+    attempt.count++;
+    loginAttempts.set(ip, attempt);
+    return res.status(401).json({ success: false, message: "Usuário ou senha incorretos." });
   }
+
+  // Login bem-sucedido: zera tentativas, gera token
+  loginAttempts.delete(ip);
+  const token = generateToken();
+  sessions.set(token, {
+    login:   mappedUser.login,
+    nome:    mappedUser.nome,
+    nivel:   mappedUser.nivel,
+    setor:   mappedUser.setor,
+    modulos: mappedUser.modulos ?? [],
+    expires: Date.now() + TOKEN_TTL,
+  });
+
+  res.json({ success: true, token, user: mappedUser });
+});
+
+// Logout
+app.post("/api/auth/logout", authenticate, (req, res) => {
+  const token = req.headers.authorization!.slice(7);
+  sessions.delete(token);
+  res.json({ success: true, message: "Sessão encerrada." });
+});
+
+// Sessão atual
+app.get("/api/auth/me", authenticate, (req, res) => {
+  res.json({ success: true, user: (req as any).currentUser });
 });
 
 // Get KoboToolbox Suprimentos data
-app.get("/api/kobo/suprimentos", async (req, res) => {
+app.get("/api/kobo/suprimentos", authenticate, async (req, res) => {
   if (!KOBO_TOKEN) {
     return res.status(400).json({ success: false, message: "Kobo token not configured in .env examples." });
   }
@@ -291,7 +357,7 @@ app.get("/api/kobo/suprimentos", async (req, res) => {
 });
 
 // Get KoboToolbox Compras / Pedidos data
-app.get("/api/kobo/compras", async (req, res) => {
+app.get("/api/kobo/compras", authenticate, async (req, res) => {
   if (!KOBO_TOKEN) {
     return res.status(400).json({ success: false, message: "Kobo token not configured in .env examples." });
   }
@@ -319,7 +385,7 @@ app.get("/api/kobo/compras", async (req, res) => {
 // This satisfies "Não criar Mock-ups, construir integracao real". The image is securely embedded in the document which works perfectly on any DB!
 
 // Backup management - Download DB as JSON File
-app.get("/api/db/download-backup", (req, res) => {
+app.get("/api/db/download-backup", authenticate, (req, res) => {
   try {
     const localDb = localRead();
     res.setHeader("Content-disposition", `attachment; filename=geplan_backup_${new Date().toISOString().slice(0,10)}.json`);
