@@ -251,7 +251,7 @@ export default function Produtos() {
   return (
     <>
       <div className="space-y-6">
-        <PageHeader title="Fichas de Produtos" subtitle="Cadastro e manutenção do catálogo de produtos." />
+        <PageHeader title="Fichas de Produtos ✓" subtitle="Cadastro e manutenção do catálogo de produtos." />
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
