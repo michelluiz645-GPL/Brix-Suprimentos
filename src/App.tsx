@@ -25,7 +25,7 @@ import ObrasProjetos  from "@/pages/ObrasProjetos";
 import Fornecedores   from "@/pages/Fornecedores";
 import RelatoriosAbastecimento from "@/pages/RelatoriosAbastecimento";
 import SuprimentosKobo from "@/pages/SuprimentosKobo";
-import MeusPedidos    from "@/pages/MeusPedidos";
+import SolicitacaoCompra from "@/pages/SolicitacaoCompra";
 import PedidosCompra  from "@/pages/PedidosCompra";
 import SegurancaEPI   from "@/pages/SegurancaEPI";
 import EquipamentosPesados from "@/pages/EquipamentosPesados";
@@ -33,6 +33,8 @@ import DebitosOficina from "@/pages/DebitosOficina";
 import SegurancaDados from "@/pages/SegurancaDados";
 import Relatorios     from "@/pages/Relatorios";
 import Usuarios       from "@/pages/Usuarios";
+import CatalogoObra   from "@/pages/CatalogoObra";
+import ReposicaoAutomatica from "@/pages/ReposicaoAutomatica";
 
 interface AuthState {
   user: User;
@@ -68,7 +70,9 @@ function AppShell() {
     localStorage.setItem("geplan_user",   JSON.stringify(u));
     localStorage.setItem("geplan_setor",  setor);
 
-    const defaultPage = setor === "ENGENHARIA" ? "Obras & Projetos" : setor === "MANUTENCAO" ? "Meus Pedidos" : "Dashboard";
+    const defaultPage = setor === "ENGENHARIA" ? "Obras & Projetos"
+      : setor === "MANUTENCAO" ? "Sol. de Compra"
+      : "Dashboard";
     localStorage.setItem("geplan_page", defaultPage);
 
     setAuth({ user: u, setor });
@@ -89,6 +93,7 @@ function AppShell() {
 
   const renderPage = () => {
     if (!auth) return null;
+    const setor = auth.setor as string;
     switch (activePage) {
       case "Dashboard":          return <Dashboard user={auth.user} setor={auth.setor} setActivePage={changePage} />;
       case "Consultar":          return <Consultar />;
@@ -104,16 +109,18 @@ function AppShell() {
       case "Funcionários":       return <Funcionarios />;
       case "Equipes":            return <Equipes />;
       case "Frotas":             return <Frotas />;
+      case "Reposição Auto.":    return <ReposicaoAutomatica />;
       case "Obras & Projetos":   return <ObrasProjetos />;
+      case "Catálogo Obra":      return <CatalogoObra />;
       case "Fornecedores":       return <Fornecedores />;
       case "Relatórios":         return <Relatorios />;
       case "Rel. Abastecimento": return <RelatoriosAbastecimento />;
       case "Suprimentos Kobo":   return <SuprimentosKobo />;
-      case "Meus Pedidos":       return <MeusPedidos />;
+      case "Sol. de Compra":     return <SolicitacaoCompra setor={setor} />;
       case "Pedidos de Compra":  return <PedidosCompra />;
       case "EPI":                return <SegurancaEPI />;
       case "Equipamentos":       return <EquipamentosPesados />;
-      case "Débitos Oficina":    return <DebitosOficina />;
+      case "Débitos Manut.":     return <DebitosOficina />;
       case "Backup":             return <SegurancaDados />;
       case "Usuários":           return <Usuarios />;
       default:
@@ -121,7 +128,7 @@ function AppShell() {
           <div className="bg-white border border-slate-100 rounded-xl p-10 text-center max-w-xl mx-auto my-8 shadow-sm">
             <span className="text-4xl block mb-3">🚧</span>
             <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest mb-2">{activePage}</h3>
-            <p className="text-xs text-slate-400">Este módulo está em homologação. Use o menu lateral para acessar outras funcionalidades.</p>
+            <p className="text-xs text-slate-400">Este módulo está em homologação.</p>
           </div>
         );
     }

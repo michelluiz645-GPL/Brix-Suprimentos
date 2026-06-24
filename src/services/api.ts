@@ -147,6 +147,13 @@ export const api = {
     compras: ()     => request<object>("/kobo/compras"),
   },
 
+  solicitacoes: {
+    list: (params?: string)  => request<object>(`/solicitacoes${params ? `?${params}` : ""}`),
+    create: (data: object)   => request<object>("/solicitacoes", { method: "POST", body: JSON.stringify(data) }),
+    updateStatus: (id: number, status: string) =>
+      request<object>(`/solicitacoes/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
+  },
+
   sistema: {
     status: ()    => request<{ connected: boolean; message: string }>("/sistema/status"),
     backup: ()    => request<object>("/sistema/backup"),

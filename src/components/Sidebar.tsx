@@ -5,7 +5,7 @@ import {
   ClipboardList, Wrench, User, Users, Car, FileSpreadsheet,
   DownloadCloud, ShoppingCart, FileText, ShieldAlert, Building2,
   Factory, AlertTriangle, Database, UserCheck, ChevronLeft,
-  ChevronRight, LogOut,
+  ChevronRight, LogOut, RefreshCw, BookOpen, ClipboardEdit,
 } from "lucide-react";
 import type { User as UserType, Setor } from "@/types";
 
@@ -33,16 +33,19 @@ const ICONS: Record<string, React.ReactNode> = {
   "Funcionários":       <User size={18} />,
   "Equipes":            <Users size={18} />,
   "Frotas":             <Car size={18} />,
+  "Reposição Auto.":    <RefreshCw size={18} />,
   "Relatórios":         <FileSpreadsheet size={18} />,
   "Suprimentos Kobo":   <DownloadCloud size={18} />,
   "Pedidos de Compra":  <ShoppingCart size={18} />,
-  "Meus Pedidos":       <FileText size={18} />,
+  "Sol. de Compra":     <ClipboardEdit size={18} />,
+  "Catálogo Obra":      <BookOpen size={18} />,
   "EPI":                <ShieldAlert size={18} />,
   "Obras & Projetos":   <Building2 size={18} />,
   "Fornecedores":       <Factory size={18} />,
-  "Débitos Oficina":    <AlertTriangle size={18} />,
+  "Débitos Manut.":     <AlertTriangle size={18} />,
   "Backup":             <Database size={18} />,
   "Usuários":           <UserCheck size={18} />,
+  "Rel. Abastecimento": <FileText size={18} />,
 };
 
 const MENUS_BY_SECTOR: Record<string, string[]> = {
@@ -50,29 +53,30 @@ const MENUS_BY_SECTOR: Record<string, string[]> = {
     "Dashboard", "Consultar", "Entrada", "Saída", "Histórico Cupons",
     "Devolução", "Entregas Pend.", "Combustíveis", "Produtos",
     "Valor Estoque", "Inventário", "Funcionários", "Equipes", "Frotas",
-    "Suprimentos Kobo", "Pedidos de Compra", "EPI", "Backup", "Usuários",
+    "Reposição Auto.", "Suprimentos Kobo", "Backup", "Usuários",
   ],
   ALMOXARIFADO_OPERADOR: [
     "Dashboard", "Consultar", "Entrada", "Saída", "Histórico Cupons",
     "Devolução", "Entregas Pend.", "Combustíveis", "Produtos",
-    "Funcionários", "Equipes", "Frotas", "Pedidos de Compra", "EPI",
+    "Funcionários", "Equipes", "Frotas", "Reposição Auto.",
   ],
   ENGENHARIA_ADMIN: [
-    "Dashboard", "Obras & Projetos", "Fornecedores", "Pedidos de Compra",
-    "EPI", "Equipamentos", "Débitos Oficina", "Suprimentos Kobo",
-    "Relatórios", "Backup",
+    "Dashboard", "Obras & Projetos", "Catálogo Obra", "Fornecedores",
+    "Sol. de Compra", "Pedidos de Compra", "EPI", "Equipamentos",
+    "Débitos Manut.", "Suprimentos Kobo", "Rel. Abastecimento", "Backup",
   ],
   ENGENHARIA_OPERADOR: [
-    "Dashboard", "Obras & Projetos", "Pedidos de Compra",
-    "EPI", "Equipamentos", "Débitos Oficina", "Suprimentos Kobo", "Relatórios",
+    "Dashboard", "Obras & Projetos", "Catálogo Obra",
+    "Sol. de Compra", "Pedidos de Compra", "EPI", "Equipamentos",
+    "Débitos Manut.", "Suprimentos Kobo", "Rel. Abastecimento",
   ],
   MANUTENCAO_ADMIN: [
-    "Dashboard", "Meus Pedidos", "Pedidos de Compra",
-    "EPI", "Equipamentos", "Débitos Oficina",
+    "Dashboard", "Sol. de Compra", "Pedidos de Compra",
+    "EPI", "Equipamentos", "Débitos Manut.",
   ],
   MANUTENCAO_OPERADOR: [
-    "Dashboard", "Meus Pedidos", "Pedidos de Compra",
-    "EPI", "Equipamentos", "Débitos Oficina",
+    "Dashboard", "Sol. de Compra", "Pedidos de Compra",
+    "EPI", "Equipamentos", "Débitos Manut.",
   ],
 };
 
@@ -141,7 +145,7 @@ export default function Sidebar({ user, setor, activePage, setActivePage, onLogo
                 }`}
               >
                 <span className={`${isActive ? "text-[#EA6C0A]" : "text-slate-500"} mr-3 shrink-0`}>
-                  {ICONS[menu] ?? "·"}
+                  {ICONS[menu] ?? <span className="text-xs">·</span>}
                 </span>
                 {!collapsed && <span>{menu}</span>}
               </button>
