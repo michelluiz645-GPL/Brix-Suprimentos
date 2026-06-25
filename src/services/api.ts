@@ -28,18 +28,20 @@ async function request<T = unknown>(
   }
 
   if (res.status === 204) return {} as T;
-  return res.json() as Promise<T>;
+  const json = await res.json();
+  // Desempacota automaticamente o wrapper { data, message } do Laravel
+  return ("data" in json ? json.data : json) as T;
 }
 
 export const api = {
   auth: {
-    login: (login: string, senha: string) =>
-      request<{ token: string; user: object }>("/auth/login", {
+    login: (login: string, senha: string, setor: string) =>
+      request<{ token: string; user: object }>("/login", {
         method: "POST",
-        body: JSON.stringify({ login, senha }),
+        body: JSON.stringify({ login, senha, setor }),
       }),
-    logout: () => request("/auth/logout", { method: "POST" }),
-    me: () => request<{ user: object }>("/auth/me"),
+    logout: () => request("/logout", { method: "POST" }),
+    me: () => request<{ user: object }>("/me"),
   },
 
   produtos: {
