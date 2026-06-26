@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "@/services/api";
 import type { Setor } from "@/types";
+import logoTerrabrix from "@/assets/logo-terrabrix.png";
 
 interface LoginProps {
   onLoginSuccess: (user: object, token: string, setor: Setor) => void;
@@ -103,7 +104,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           className="absolute inset-0 bg-cover bg-center z-0"
           style={{
             backgroundImage:
-              "url('https://images.unsplash.com/photo-1541888946425-d81bb19240f5?auto=format&fit=crop&w=1200&q=80')",
+              "url('https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&w=1200&q=80')",
           }}
         />
         <div className="absolute inset-0 bg-[#0D1420]/75 z-0" />
@@ -111,18 +112,13 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         <div className="relative z-10 flex flex-col h-full justify-between">
           <div>
             {/* Logo */}
-            <button
-              onClick={() => navigate("/")}
-              className="flex items-center gap-2 mb-1 group"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-[#EA6C0A]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-              </svg>
-              <span className="text-3xl font-black tracking-tight text-white">
-                GE<span className="text-[#EA6C0A]">PLAN</span>
-              </span>
+            <button onClick={() => navigate("/")} className="mb-6 block">
+              <img
+                src={logoTerrabrix}
+                alt="Terrabrix Engenharia"
+                className="h-16 w-auto drop-shadow-lg"
+              />
             </button>
-            <p className="text-sm text-slate-400 mb-6 ml-10">Sistema de Gestão Operacional</p>
 
             <div className="flex flex-col gap-1 mb-10">
               <div className="w-8 h-0.5 bg-[#2563EB] rounded" />
