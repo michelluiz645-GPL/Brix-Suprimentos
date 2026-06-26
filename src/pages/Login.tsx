@@ -104,7 +104,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           className="absolute inset-0 bg-cover bg-center z-0"
           style={{
             backgroundImage:
-              "url('https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&w=1200&q=80')",
+              "url('https://images.unsplash.com/photo-1580828343064-fde4fc206bc6?auto=format&fit=crop&w=1200&q=80')",
           }}
         />
         <div className="absolute inset-0 bg-[#0D1420]/75 z-0" />
