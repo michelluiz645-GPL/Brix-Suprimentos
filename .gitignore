@@ -18,7 +18,8 @@ build/
 public/version.json
 
 # ── Banco de dados local (Node.js JSON DB) ──
-database/
+/database/
+!backend/database/
 *.json
 !package.json
 !package-lock.json
