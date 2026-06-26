@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import api from "@/services/api";
 import type { Setor } from "@/types";
 import logoTerrabrix from "@/assets/logo-terrabrix.png";
+import bgLogin from "@/assets/bg-login.png";
 
 interface LoginProps {
   onLoginSuccess: (user: object, token: string, setor: Setor) => void;
@@ -104,7 +105,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           className="absolute inset-0 bg-cover bg-center z-0"
           style={{
             backgroundImage:
-              "url('https://images.unsplash.com/photo-1580828343064-fde4fc206bc6?auto=format&fit=crop&w=1200&q=80')",
+              `url('${bgLogin}')`,
           }}
         />
         <div className="absolute inset-0 bg-[#0D1420]/75 z-0" />
