@@ -33,8 +33,7 @@ export default function Usuarios() {
   const load = () => {
     setLoading(true);
     api.usuarios.list().then((r) => {
-      const d = (r as { data: User[] }).data ?? [];
-      setUsers(Array.isArray(d) ? d : Object.values(d));
+      setUsers(Array.isArray(r) ? r as User[] : []);
     }).finally(() => setLoading(false));
   };
   useEffect(() => { load(); }, []);
