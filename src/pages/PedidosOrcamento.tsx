@@ -94,86 +94,8 @@ const criarTimeline = (solicitante: string): TimelineStep[] =>
     estado: i === 0 ? "atual" : "futuro",
   }));
 
-// ─── Dados de exemplo ─────────────────────────────────────────────────────────
-const PEDIDOS_MOCK: Pedido[] = [
-  { id:1, numero_sc:"SC-2026-001", data:"2026-06-01", setor:"MANUTENCAO", destino:"PC200 - Escavadeira", tipo_destino:"FROTA",
-    urgencia:"CRITICA", status:"EM_TRANSITO", valor_total:18750, solicitante:"Carlos Souza",
-    itens:[{descricao:"Filtro de óleo motor",quantidade:4,unidade:"Un"},{descricao:"Correia dentada",quantidade:2,unidade:"Un"},{descricao:"Óleo lubrificante 15W40",quantidade:20,unidade:"Lt"}],
-    timeline:[
-      {titulo:"Solicitação criada",subtitulo:"Carlos Souza — Manutenção",data:"01/06/2026 08:14",estado:"concluido"},
-      {titulo:"Cotação em andamento",subtitulo:"Fornecedor: Auto Peças Brix",data:"03/06/2026 10:30",estado:"concluido"},
-      {titulo:"Aguardando aprovação",subtitulo:"Encaminhado por: Suprimentos",data:"05/06/2026 14:00",estado:"concluido"},
-      {titulo:"Aprovado",subtitulo:"Aprovado por: Admin — R$ 18.750,00",data:"06/06/2026 09:20",estado:"concluido"},
-      {titulo:"Em trânsito",subtitulo:"Confirmado por: Almoxarifado",data:"08/06/2026 11:00",estado:"atual"},
-      {titulo:"Entrega concluída",subtitulo:"",data:undefined,estado:"futuro"},
-    ]},
-  { id:2, numero_sc:"SC-2026-002", data:"2026-06-05", setor:"MANUTENCAO", destino:"Obra Central", tipo_destino:"OBRA",
-    urgencia:"ALTA", status:"APROVADO", valor_total:9200, solicitante:"Ana Lima",
-    itens:[{descricao:"Parafuso sextavado M12",quantidade:100,unidade:"Un"},{descricao:"Mangueira hidráulica 3/4\"",quantidade:5,unidade:"Mt"}],
-    timeline:[
-      {titulo:"Solicitação criada",subtitulo:"Ana Lima — Manutenção",data:"05/06/2026 07:50",estado:"concluido"},
-      {titulo:"Cotação em andamento",subtitulo:"Fornecedor: TechnoPeças",data:"07/06/2026 13:00",estado:"concluido"},
-      {titulo:"Aguardando aprovação",subtitulo:"Encaminhado por: Suprimentos",data:"10/06/2026 09:00",estado:"concluido"},
-      {titulo:"Aprovado",subtitulo:"Aprovado por: Admin — R$ 9.200,00",data:"11/06/2026 16:00",estado:"atual"},
-      {titulo:"Em trânsito",subtitulo:"",data:undefined,estado:"futuro"},
-      {titulo:"Entrega concluída",subtitulo:"",data:undefined,estado:"futuro"},
-    ]},
-  { id:3, numero_sc:"SC-2026-003", data:"2026-06-10", setor:"MANUTENCAO", destino:"WA320 - Pá Carregadeira", tipo_destino:"FROTA",
-    urgencia:"MEDIA", status:"COTANDO", valor_total:4350, solicitante:"Roberto Melo",
-    itens:[{descricao:"Pneu 20.5R25",quantidade:2,unidade:"Un"},{descricao:"Kit vedação cilindro",quantidade:4,unidade:"Jg"}],
-    timeline:[
-      {titulo:"Solicitação criada",subtitulo:"Roberto Melo — Manutenção",data:"10/06/2026 10:00",estado:"concluido"},
-      {titulo:"Cotação em andamento",subtitulo:"Aguardando retorno de 2 fornecedores",data:"12/06/2026 08:30",estado:"atual"},
-      {titulo:"Aguardando aprovação",subtitulo:"",data:undefined,estado:"futuro"},
-      {titulo:"Aprovado",subtitulo:"",data:undefined,estado:"futuro"},
-      {titulo:"Em trânsito",subtitulo:"",data:undefined,estado:"futuro"},
-      {titulo:"Entrega concluída",subtitulo:"",data:undefined,estado:"futuro"},
-    ]},
-  { id:4, numero_sc:"SC-2026-004", data:"2026-06-12", setor:"MANUTENCAO", destino:"Compressor de Ar 250L", tipo_destino:"EQUIPAMENTO",
-    urgencia:"BAIXA", status:"CONCLUIDO", valor_total:1800, solicitante:"Fernanda Costa",
-    itens:[{descricao:"Anel de pistão",quantidade:1,unidade:"Jg"}],
-    timeline:[
-      {titulo:"Solicitação criada",subtitulo:"Fernanda Costa — Manutenção",data:"12/06/2026 09:00",estado:"concluido"},
-      {titulo:"Cotação em andamento",subtitulo:"Fornecedor: Aço & Metal Ltda",data:"13/06/2026 11:00",estado:"concluido"},
-      {titulo:"Aguardando aprovação",subtitulo:"Encaminhado por: Suprimentos",data:"14/06/2026 14:00",estado:"concluido"},
-      {titulo:"Aprovado",subtitulo:"Aprovado por: Admin — R$ 1.800,00",data:"15/06/2026 08:00",estado:"concluido"},
-      {titulo:"Em trânsito",subtitulo:"Confirmado por: Almoxarifado",data:"16/06/2026 10:00",estado:"concluido"},
-      {titulo:"Entrega concluída",subtitulo:"Recebido por: Fernanda Costa",data:"18/06/2026 14:30",estado:"concluido"},
-    ]},
-  { id:5, numero_sc:"SC-2026-005", data:"2026-06-15", setor:"MANUTENCAO", destino:"PC200 - Escavadeira", tipo_destino:"FROTA",
-    urgencia:"CRITICA", status:"REJEITADO", valor_total:22000, solicitante:"Carlos Souza",
-    itens:[{descricao:"Motor de arranque completo",quantidade:1,unidade:"Un"},{descricao:"Bomba hidráulica",quantidade:1,unidade:"Un"}],
-    timeline:[
-      {titulo:"Solicitação criada",subtitulo:"Carlos Souza — Manutenção",data:"15/06/2026 07:00",estado:"concluido"},
-      {titulo:"Cotação em andamento",subtitulo:"Fornecedor: ImportPeças SP",data:"16/06/2026 10:00",estado:"concluido"},
-      {titulo:"Aguardando aprovação",subtitulo:"Encaminhado por: Suprimentos",data:"17/06/2026 09:00",estado:"concluido"},
-      {titulo:"Rejeitado",subtitulo:"Rejeitado por: Admin — valor acima do orçamento",data:"17/06/2026 16:45",estado:"rejeitado"},
-      {titulo:"Em trânsito",subtitulo:"",data:undefined,estado:"futuro"},
-      {titulo:"Entrega concluída",subtitulo:"",data:undefined,estado:"futuro"},
-    ]},
-  { id:6, numero_sc:"SC-2026-006", data:"2026-06-18", setor:"MANUTENCAO", destino:"Obra Contorno Sul", tipo_destino:"OBRA",
-    urgencia:"ALTA", status:"AGUARDANDO_APROVACAO", valor_total:13600, solicitante:"Marcos Alves",
-    itens:[{descricao:"Tubo de aço 2\"",quantidade:12,unidade:"Mt"},{descricao:"Luva de emenda",quantidade:6,unidade:"Un"}],
-    timeline:[
-      {titulo:"Solicitação criada",subtitulo:"Marcos Alves — Manutenção",data:"18/06/2026 08:00",estado:"concluido"},
-      {titulo:"Cotação em andamento",subtitulo:"Fornecedor: TechnoPeças",data:"20/06/2026 10:00",estado:"concluido"},
-      {titulo:"Aguardando aprovação",subtitulo:"Encaminhado por: Suprimentos",data:"22/06/2026 14:00",estado:"atual"},
-      {titulo:"Aprovado",subtitulo:"",data:undefined,estado:"futuro"},
-      {titulo:"Em trânsito",subtitulo:"",data:undefined,estado:"futuro"},
-      {titulo:"Entrega concluída",subtitulo:"",data:undefined,estado:"futuro"},
-    ]},
-  { id:7, numero_sc:"SC-2026-007", data:"2026-06-20", setor:"MANUTENCAO", destino:"WA500 - Pá Carregadeira", tipo_destino:"FROTA",
-    urgencia:"MEDIA", status:"PENDENTE", valor_total:6800, solicitante:"Josefa Ramos",
-    itens:[{descricao:"Filtro hidráulico",quantidade:2,unidade:"Un"},{descricao:"Graxa de lítio 3kg",quantidade:5,unidade:"Balde"}],
-    timeline:[
-      {titulo:"Solicitação criada",subtitulo:"Josefa Ramos — Manutenção",data:"20/06/2026 11:00",estado:"atual"},
-      {titulo:"Cotação em andamento",subtitulo:"",data:undefined,estado:"futuro"},
-      {titulo:"Aguardando aprovação",subtitulo:"",data:undefined,estado:"futuro"},
-      {titulo:"Aprovado",subtitulo:"",data:undefined,estado:"futuro"},
-      {titulo:"Em trânsito",subtitulo:"",data:undefined,estado:"futuro"},
-      {titulo:"Entrega concluída",subtitulo:"",data:undefined,estado:"futuro"},
-    ]},
-];
+// ─── Estado inicial vazio — pedidos criados em tempo real ────────────────────
+const PEDIDOS_MOCK: Pedido[] = [];
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 interface Props {
@@ -266,7 +188,7 @@ export default function PedidosOrcamento({ user, setor }: Props) {
   const handleCriar = () => {
     if (!form.destino.trim()) return;
     if (form.itens.some(i=>!i.descricao.trim()||i.quantidade<=0)) return;
-    const nextId = Math.max(...pedidos.map(p=>p.id))+1;
+    const nextId = pedidos.length > 0 ? Math.max(...pedidos.map(p=>p.id))+1 : 1;
     const sc = `SC-2026-${String(nextId).padStart(3,"0")}`;
     const novo: Pedido = {
       id: nextId, numero_sc: sc, data: todayISO(),
