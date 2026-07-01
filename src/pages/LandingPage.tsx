@@ -153,7 +153,7 @@ export default function LandingPage() {
             {[
               {
                 icon: <Package size={24} />,
-                label: "Almoxarifado",
+                label: "Suprimentos",
                 color: "#2563EB",
                 modules: ["Dashboard de KPIs", "Entrada e Saída de materiais", "Controle de estoque", "Combustíveis", "Inventário físico", "Fichas de produtos", "Equipes e funcionários"],
               },

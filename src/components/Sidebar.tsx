@@ -82,7 +82,7 @@ const MENUS_BY_SECTOR: Record<string, string[]> = {
 };
 
 const SECTOR_LABELS: Record<string, string> = {
-  ALMOXARIFADO: "📦 Almoxarifado",
+  ALMOXARIFADO: "📦 Suprimentos",
   ENGENHARIA:   "🏗️ Engenharia",
   MANUTENCAO:   "🔧 Manutenção",
 };

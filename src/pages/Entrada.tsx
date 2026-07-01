@@ -45,7 +45,7 @@ export default function Entrada() {
     e.preventDefault();
     if (!numeroNf.trim())       { toast.error("Campo obrigatório: Número da NF."); return; }
     if (!fornecedor.trim())     { toast.error("Campo obrigatório: Fornecedor."); return; }
-    if (!almoxarifado.trim())   { toast.error("Campo obrigatório: Almoxarifado."); return; }
+    if (!almoxarifado.trim())   { toast.error("Campo obrigatório: Suprimentos."); return; }
     if (!responsavel.trim())    { toast.error("Campo obrigatório: Responsável."); return; }
     if (!data)                  { toast.error("Campo obrigatório: Data de recebimento."); return; }
     if (itens.some((i) => !i.codigo)) { toast.error("Todos os itens precisam ter um produto selecionado."); return; }
@@ -75,7 +75,7 @@ export default function Entrada() {
             {[
               { label: "Número da NF *", value: numeroNf, set: setNumeroNf, placeholder: "Ex: 000123" },
               { label: "Fornecedor *",    value: fornecedor, set: setFornecedor, placeholder: "Nome do fornecedor" },
-              { label: "Almoxarifado *",  value: almoxarifado, set: setAlmoxarifado, placeholder: "Ex: Almox Central" },
+              { label: "Suprimentos *",  value: almoxarifado, set: setAlmoxarifado, placeholder: "Ex: Almox Central" },
               { label: "Responsável *",   value: responsavel, set: setResponsavel, placeholder: "Responsável pelo recebimento" },
             ].map((f) => (
               <div key={f.label}>

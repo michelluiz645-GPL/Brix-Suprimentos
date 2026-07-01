@@ -178,7 +178,7 @@ export default function DebitosOficina() {
                 {([
                   ["Equipe", sel.nome_equipe || sel.equipe],
                   ["Colaborador", sel.colaborador || "—"],
-                  ["Almoxarifado", sel.almoxarifado || "—"],
+                  ["Suprimentos", sel.almoxarifado || "—"],
                   ["Registrado por", sel.registrado_por],
                 ] as [string, string][]).map(([k, v]) => (
                   <div key={k}><span className="font-bold text-slate-500 block">{k}</span><span className="text-slate-700">{v}</span></div>

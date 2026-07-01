@@ -63,7 +63,7 @@ export default function HistoricoCupons() {
       ${(c.itens ?? []).map((it) => `<tr><td>${it.nome}</td><td>${it.qtd}</td><td>${it.unid}</td><td>R$ ${(it.qtd * it.preco).toFixed(2)}</td></tr>`).join("")}
       </table>
       <p class="total">Total Geral: R$ ${totalVal(c).toFixed(2)}</p>
-      <p style="margin-top:12px"><b>Resp. Almoxarifado:</b> ${c.resp_almox}</p>
+      <p style="margin-top:12px"><b>Resp. Suprimentos:</b> ${c.resp_almox}</p>
       </body></html>
     `);
     win.print();
@@ -141,8 +141,8 @@ export default function HistoricoCupons() {
               <div className="grid grid-cols-2 gap-3 text-xs">
                 {([
                   ["Entregador", cupomSel.entregador],
-                  ["Resp. Almoxarifado", cupomSel.resp_almox],
-                  ["Almoxarifado", cupomSel.almoxarifado],
+                  ["Resp. Suprimentos", cupomSel.resp_almox],
+                  ["Suprimentos", cupomSel.almoxarifado],
                   ["Colaborador", cupomSel.colaborador || "—"],
                 ] as [string, string][]).map(([k, v]) => (
                   <div key={k}><span className="font-bold text-slate-500 block">{k}</span><span className="text-slate-700">{v}</span></div>

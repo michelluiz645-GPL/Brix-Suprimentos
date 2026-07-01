@@ -42,8 +42,8 @@ export default function Saida() {
     e.preventDefault();
     if (!equipe.trim())     { toast.error("Campo obrigatório: Equipe / Destinatário."); return; }
     if (!entregador.trim()) { toast.error("Campo obrigatório: Entregador."); return; }
-    if (!respAlmox.trim())  { toast.error("Campo obrigatório: Resp. Almoxarifado."); return; }
-    if (!almox.trim())      { toast.error("Campo obrigatório: Almoxarifado."); return; }
+    if (!respAlmox.trim())  { toast.error("Campo obrigatório: Resp. Suprimentos."); return; }
+    if (!almox.trim())      { toast.error("Campo obrigatório: Suprimentos."); return; }
     if (!data)              { toast.error("Campo obrigatório: Data."); return; }
     if (itens.some((i) => !i.codigo))   { toast.error("Todos os itens precisam ter um produto selecionado."); return; }
     if (itens.some((i) => i.qtd <= 0))  { toast.error("Todos os itens precisam ter quantidade maior que zero."); return; }
@@ -72,8 +72,8 @@ export default function Saida() {
               { label: "Equipe / Destinatário *", value: equipe, set: setEquipe, placeholder: "Ex: Equipe 01" },
               { label: "Colaborador", value: colaborador, set: setColab, placeholder: "Nome do colaborador" },
               { label: "Entregador *", value: entregador, set: setEntreg, placeholder: "Quem entregou" },
-              { label: "Resp. Almoxarifado *", value: respAlmox, set: setResp, placeholder: "Almoxarife responsável" },
-              { label: "Almoxarifado *", value: almox, set: setAlmox, placeholder: "Ex: Almox Central" },
+              { label: "Resp. Suprimentos *", value: respAlmox, set: setResp, placeholder: "Responsável Suprimentos" },
+              { label: "Suprimentos *", value: almox, set: setAlmox, placeholder: "Ex: Almox Central" },
             ].map((f) => (
               <div key={f.label}>
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">{f.label}</label>
