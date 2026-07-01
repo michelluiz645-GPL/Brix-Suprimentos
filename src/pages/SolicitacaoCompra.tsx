@@ -50,8 +50,7 @@ export default function SolicitacaoCompra({ setor = "ENGENHARIA" }: Props) {
     setLoading(true);
     const params = filtroStatus ? `status=${filtroStatus}` : undefined;
     api.solicitacoes?.list(params).then((r: unknown) => {
-      const d = (r as { data: SC[] }).data ?? [];
-      setLista(Array.isArray(d) ? d : Object.values(d));
+      setLista(Array.isArray(r) ? r as SC[] : []);
     }).catch(() => setLista([])).finally(() => setLoading(false));
   };
 
