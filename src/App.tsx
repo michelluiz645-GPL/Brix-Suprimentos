@@ -40,7 +40,8 @@ import NovaSC         from "@/pages/SC/NovaSC";
 import MeusPedidosSC  from "@/pages/SC/MeusPedidos";
 import FilaCotacao    from "@/pages/SC/FilaCotacao";
 import FilaAprovacaoSC from "@/pages/SC/FilaAprovacao";
-import EntradasSC     from "@/pages/SC/Entradas";
+import EntradasSC       from "@/pages/SC/Entradas";
+import RegistrarCompra  from "@/pages/SC/RegistrarCompra";
 
 interface AuthState {
   user: User;
@@ -135,6 +136,7 @@ function AppShell() {
       case "Fila Cotação":       return <FilaCotacao />;
       case "Fila Aprovação SC":  return <FilaAprovacaoSC user={auth.user} />;
       case "Entradas SC":        return <EntradasSC />;
+      case "Registrar Compra":   return <RegistrarCompra />;
       default:
         return (
           <div className="bg-white border border-slate-100 rounded-xl p-10 text-center max-w-xl mx-auto my-8 shadow-sm">
