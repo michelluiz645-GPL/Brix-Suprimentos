@@ -39,6 +39,11 @@ const ICONS: Record<string, React.ReactNode> = {
   "Pedidos de Compra":  <ShoppingCart size={18} />,
   "Ped. Orçamento":     <ClipboardList size={18} />,
   "Sol. de Compra":     <ClipboardEdit size={18} />,
+  "Nova SC":            <ClipboardEdit size={18} />,
+  "Meus Pedidos SC":    <ClipboardList size={18} />,
+  "Fila Cotação":       <ShoppingCart size={18} />,
+  "Fila Aprovação SC":  <ShieldAlert size={18} />,
+  "Entradas SC":        <ArrowDownToLine size={18} />,
   "Catálogo Obra":      <BookOpen size={18} />,
   "EPI":                <ShieldAlert size={18} />,
   "Obras & Projetos":   <Building2 size={18} />,
@@ -54,12 +59,15 @@ const MENUS_BY_SECTOR: Record<string, string[]> = {
     "Dashboard", "Consultar", "Entrada", "Saída", "Histórico Cupons",
     "Devolução", "Entregas Pend.", "Combustíveis", "Produtos",
     "Valor Estoque", "Inventário", "Funcionários", "Equipes", "Frotas",
-    "Reposição Auto.", "Ped. Orçamento", "Suprimentos Kobo", "Backup", "Usuários",
+    "Reposição Auto.", "Ped. Orçamento",
+    "Fila Cotação", "Fila Aprovação SC", "Entradas SC",
+    "Suprimentos Kobo", "Backup", "Usuários",
   ],
   ALMOXARIFADO_OPERADOR: [
     "Dashboard", "Consultar", "Entrada", "Saída", "Histórico Cupons",
     "Devolução", "Entregas Pend.", "Combustíveis", "Produtos",
     "Funcionários", "Equipes", "Frotas", "Reposição Auto.", "Ped. Orçamento",
+    "Fila Cotação", "Entradas SC",
   ],
   ENGENHARIA_ADMIN: [
     "Dashboard", "Obras & Projetos", "Catálogo Obra", "Fornecedores",
@@ -72,11 +80,11 @@ const MENUS_BY_SECTOR: Record<string, string[]> = {
     "Débitos Manut.", "Suprimentos Kobo", "Rel. Abastecimento",
   ],
   MANUTENCAO_ADMIN: [
-    "Dashboard", "Sol. de Compra", "Pedidos de Compra", "Ped. Orçamento",
-    "EPI", "Equipamentos", "Débitos Manut.",
+    "Dashboard", "Nova SC", "Meus Pedidos SC", "Fila Aprovação SC",
+    "Ped. Orçamento", "EPI", "Equipamentos", "Débitos Manut.",
   ],
   MANUTENCAO_OPERADOR: [
-    "Dashboard", "Sol. de Compra", "Pedidos de Compra", "Ped. Orçamento",
+    "Dashboard", "Nova SC", "Meus Pedidos SC", "Ped. Orçamento",
     "EPI", "Equipamentos", "Débitos Manut.",
   ],
 };

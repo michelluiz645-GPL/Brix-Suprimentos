@@ -149,11 +149,17 @@ export const api = {
     compras: ()     => request<object>("/kobo/compras"),
   },
 
-  solicitacoes: {
-    list: (params?: string)  => request<object>(`/solicitacoes${params ? `?${params}` : ""}`),
-    create: (data: object)   => request<object>("/solicitacoes", { method: "POST", body: JSON.stringify(data) }),
-    updateStatus: (id: number, status: string) =>
-      request<object>(`/solicitacoes/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
+  sc: {
+    list:   (params?: string) => request<object[]>(`/sc${params ? `?${params}` : ""}`),
+    show:   (id: number)      => request<object>(`/sc/${id}`),
+    create: (data: object)    => request<object>("/sc", { method: "POST", body: JSON.stringify(data) }),
+    cotacao:    (id: number, data: object) => request<object>(`/sc/${id}/cotacao`,     { method: "POST", body: JSON.stringify(data) }),
+    aprovarMnt: (id: number, data: object) => request<object>(`/sc/${id}/aprovar-mnt`, { method: "POST", body: JSON.stringify(data) }),
+    rejeitarMnt:(id: number, data: object) => request<object>(`/sc/${id}/rejeitar-mnt`,{ method: "POST", body: JSON.stringify(data) }),
+    aprovarSup: (id: number, data: object) => request<object>(`/sc/${id}/aprovar-sup`, { method: "POST", body: JSON.stringify(data) }),
+    comprar:    (id: number, data: object) => request<object>(`/sc/${id}/comprar`,     { method: "POST", body: JSON.stringify(data) }),
+    entrada:    (id: number, data: object) => request<object>(`/sc/${id}/entrada`,     { method: "POST", body: JSON.stringify(data) }),
+    entradaParcial: (id: number, data: object) => request<object>(`/sc/${id}/entrada-parcial`, { method: "POST", body: JSON.stringify(data) }),
   },
 
   sistema: {

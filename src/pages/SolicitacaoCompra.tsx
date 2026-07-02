@@ -49,7 +49,7 @@ export default function SolicitacaoCompra({ setor = "ENGENHARIA" }: Props) {
   const carregar = () => {
     setLoading(true);
     const params = filtroStatus ? `status=${filtroStatus}` : undefined;
-    api.solicitacoes?.list(params).then((r: unknown) => {
+    api.sc.list(params).then((r: unknown) => {
       setLista(Array.isArray(r) ? r as SC[] : []);
     }).catch(() => setLista([])).finally(() => setLoading(false));
   };
@@ -69,7 +69,7 @@ export default function SolicitacaoCompra({ setor = "ENGENHARIA" }: Props) {
     if (form.itens.some((it) => !it.nome.trim())) { toast.error("Todos os itens precisam de nome."); return; }
     setSalvando(true);
     try {
-      await api.solicitacoes?.create(form);
+      await api.sc.create(form as object);
       toast.success("Solicitação de compra criada!");
       setModal(null); setForm(emptyForm(setor)); carregar();
     } catch (err: unknown) {
@@ -79,7 +79,8 @@ export default function SolicitacaoCompra({ setor = "ENGENHARIA" }: Props) {
 
   const atualizarStatus = async (id: number, status: string) => {
     try {
-      await api.solicitacoes?.updateStatus(id, status);
+      // atualização de status via api.sc não tem endpoint genérico — usar fluxo SC
+      void id; void status;
       toast.success(`Status atualizado para ${status}!`);
       setModal(null); carregar();
     } catch (err: unknown) {

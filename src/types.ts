@@ -5,11 +5,31 @@ export enum UserLevel {
 
 export type Setor = "ALMOXARIFADO" | "ENGENHARIA" | "MANUTENCAO";
 
+export type Papel =
+  | "op_manutencao"
+  | "admin_manutencao"
+  | "op_suprimentos"
+  | "admin_suprimentos"
+  | "almoxarife"
+  | "admin_geral";
+
+export const PAPEL_LABELS: Record<Papel, string> = {
+  op_manutencao:    "Operacional Manutenção",
+  admin_manutencao: "Admin Manutenção",
+  op_suprimentos:   "Operacional Suprimentos",
+  admin_suprimentos:"Admin Suprimentos",
+  almoxarife:       "Almoxarife",
+  admin_geral:      "Administrador Geral",
+};
+
 export interface User {
   id?: number;
   login: string;
   nome: string;
+  email?: string;
+  whatsapp?: string;
   nivel: UserLevel | string;
+  papel?: Papel | string;
   setor: Setor | string;
   modulos: string[];
   senha?: string;

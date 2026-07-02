@@ -36,6 +36,11 @@ import Usuarios       from "@/pages/Usuarios";
 import CatalogoObra   from "@/pages/CatalogoObra";
 import ReposicaoAutomatica from "@/pages/ReposicaoAutomatica";
 import PedidosOrcamento  from "@/pages/PedidosOrcamento";
+import NovaSC         from "@/pages/SC/NovaSC";
+import MeusPedidosSC  from "@/pages/SC/MeusPedidos";
+import FilaCotacao    from "@/pages/SC/FilaCotacao";
+import FilaAprovacaoSC from "@/pages/SC/FilaAprovacao";
+import EntradasSC     from "@/pages/SC/Entradas";
 
 interface AuthState {
   user: User;
@@ -124,7 +129,12 @@ function AppShell() {
       case "Débitos Manut.":     return <DebitosOficina />;
       case "Backup":             return <SegurancaDados />;
       case "Usuários":           return <Usuarios />;
-      case "Ped. Orçamento":    return <PedidosOrcamento user={auth.user} setor={setor} />;
+      case "Ped. Orçamento":     return <PedidosOrcamento user={auth.user} setor={setor} />;
+      case "Nova SC":            return <NovaSC user={auth.user} onConcluir={() => changePage("Meus Pedidos SC")} />;
+      case "Meus Pedidos SC":    return <MeusPedidosSC user={auth.user} />;
+      case "Fila Cotação":       return <FilaCotacao />;
+      case "Fila Aprovação SC":  return <FilaAprovacaoSC user={auth.user} />;
+      case "Entradas SC":        return <EntradasSC />;
       default:
         return (
           <div className="bg-white border border-slate-100 rounded-xl p-10 text-center max-w-xl mx-auto my-8 shadow-sm">

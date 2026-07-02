@@ -5,7 +5,9 @@ import PageHeader from "@/components/PageHeader";
 import { useToast } from "@/hooks/useToast";
 import ToastContainer from "@/components/Toast";
 import type { User } from "@/types";
+import { PAPEL_LABELS } from "@/types";
 import { Plus, Edit, Lock } from "lucide-react";
+import CadastroUsuario from "@/pages/Usuarios/CadastroUsuario";
 
 const SETORES  = ["ALMOXARIFADO", "ENGENHARIA", "MANUTENCAO"];
 const NIVEIS   = ["OPERADOR", "ADMIN"];
@@ -92,13 +94,14 @@ export default function Usuarios() {
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
                 <thead><tr className="bg-slate-50 border-b border-slate-100">
-                  {["Usuário", "Nome", "Nível", "Setor", "Módulos", ""].map((h) => <th key={h} className="p-3 font-semibold text-slate-500">{h}</th>)}
+                  {["Usuário", "Nome", "Papel", "Nível", "Setor", "Módulos", ""].map((h) => <th key={h} className="p-3 font-semibold text-slate-500">{h}</th>)}
                 </tr></thead>
                 <tbody className="divide-y divide-slate-50">
                   {users.map((u) => (
                     <tr key={u.login} className="hover:bg-slate-50/50">
                       <td className="p-3 font-mono font-bold text-slate-700">{u.login}</td>
                       <td className="p-3 font-semibold text-slate-800">{u.nome}</td>
+                      <td className="p-3"><span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">{u.papel ? (PAPEL_LABELS[u.papel as keyof typeof PAPEL_LABELS] ?? u.papel) : "—"}</span></td>
                       <td className="p-3"><span className={`px-2 py-1 rounded-full text-[10px] font-bold ${NIVEL_COLOR[u.nivel] ?? "bg-slate-100 text-slate-600"}`}>{u.nivel}</span></td>
                       <td className="p-3 text-slate-500">{u.setor}</td>
                       <td className="p-3 text-slate-400">{u.nivel === "ADMIN" ? "Todos" : `${(u.modulos ?? []).length} módulos`}</td>
@@ -116,8 +119,26 @@ export default function Usuarios() {
         </div>
       </div>
 
-      {/* Create / Edit modal */}
-      <Modal isOpen={modal === "create" || modal === "edit"} onClose={() => setModal(null)} title={modal === "create" ? "Novo Usuário" : "Editar Usuário"} size="lg">
+      {/* Modal criação — usa CadastroUsuario */}
+      <Modal isOpen={modal === "create"} onClose={() => setModal(null)} title="Novo Usuário" size="xl">
+        <CadastroUsuario
+          salvando={saving}
+          onCancelar={() => setModal(null)}
+          onSalvar={async (dados) => {
+            setSaving(true);
+            try {
+              await api.usuarios.create(dados as object);
+              toast.success("Usuário criado com sucesso!");
+              setModal(null); load();
+            } catch (err: unknown) {
+              toast.error(err instanceof Error ? err.message : "Não foi possível criar o usuário.");
+            } finally { setSaving(false); }
+          }}
+        />
+      </Modal>
+
+      {/* Edit modal (mantém formulário simples) */}
+      <Modal isOpen={modal === "edit"} onClose={() => setModal(null)} title="Editar Usuário" size="lg">
         <div className="space-y-4 text-sm">
           <div className="grid grid-cols-2 gap-4">
             {[
