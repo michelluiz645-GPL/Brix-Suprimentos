@@ -3,31 +3,78 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, SoftDeletes;
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
+
+    public const NIVEL_ADMIN    = 'ADMIN';
+    public const NIVEL_OPERADOR = 'OPERADOR';
+
+    public const PAPEIS = [
+        'op_manutencao',
+        'admin_manutencao',
+        'op_suprimentos',
+        'admin_suprimentos',
+        'almoxarife',
+        'admin_geral',
+    ];
+
+    public const PAPEL_LABELS = [
+        'op_manutencao'    => 'Operacional Manutenção',
+        'admin_manutencao' => 'Admin Manutenção',
+        'op_suprimentos'   => 'Operacional Suprimentos',
+        'admin_suprimentos'=> 'Admin Suprimentos',
+        'almoxarife'       => 'Almoxarife',
+        'admin_geral'      => 'Administrador Geral',
+    ];
 
     protected $fillable = [
-        'login',
-        'nome',
-        'senha',
-        'nivel',
-        'setor',
-        'modulos',
+        'nome', 'login', 'email', 'whatsapp', 'password',
+        'nivel', 'papel', 'setor_id', 'ativo',
     ];
 
-    protected $hidden = ['senha', 'remember_token'];
+    protected $hidden = [
+        'password', 'remember_token',
+    ];
 
     protected $casts = [
-        'modulos' => 'array',
+        'email_verified_at' => 'datetime',
+        'password'          => 'hashed',
+        'ativo'             => 'boolean',
     ];
 
-    public function getAuthPassword(): string
+    public function setor(): BelongsTo
     {
-        return $this->senha;
+        return $this->belongsTo(Setor::class);
+    }
+
+    public function modulos(): BelongsToMany
+    {
+        return $this->belongsToMany(Modulo::class, 'user_modulo');
+    }
+
+    public function temModulo(string $chave): bool
+    {
+        if ($this->nivel === self::NIVEL_ADMIN && $chave === 'administracao_usuarios') {
+            return true;
+        }
+        return $this->modulos()->where('chave', $chave)->exists();
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->nivel === self::NIVEL_ADMIN;
+    }
+
+    public function temPapel(string ...$papeis): bool
+    {
+        return in_array($this->papel, $papeis, true) || $this->papel === 'admin_geral';
     }
 }
