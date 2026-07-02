@@ -11,10 +11,36 @@ import CadastroUsuario from "@/pages/Usuarios/CadastroUsuario";
 
 const SETORES  = ["ALMOXARIFADO", "ENGENHARIA", "MANUTENCAO"];
 const NIVEIS   = ["OPERADOR", "ADMIN"];
-const MODULOS_ALL = [
-  "Dashboard","Consultar","Entrada","Saída","Histórico Cupons","Devolução","Entregas Pend.","Combustíveis","Produtos",
-  "Valor Estoque","Inventário","Funcionários","Equipes","Frotas","Suprimentos Kobo","Pedidos de Compra","EPI",
-  "Obras & Projetos","Fornecedores","Débitos Oficina","Relatórios","Backup","Usuários","Meus Pedidos","Equipamentos",
+
+const MODULOS_ALL: { chave: string; label: string }[] = [
+  { chave: "dashboard",              label: "Dashboard" },
+  { chave: "consultar_catalogo",     label: "Consultar Catálogo" },
+  { chave: "registrar_entrada",      label: "Registrar Entrada" },
+  { chave: "registrar_saida",        label: "Registrar Saída" },
+  { chave: "historico_cupons",       label: "Histórico Cupons" },
+  { chave: "devolucao",              label: "Devolução" },
+  { chave: "entregas_pendentes",     label: "Entregas Pendentes" },
+  { chave: "combustiveis",           label: "Combustíveis" },
+  { chave: "fichas_produtos",        label: "Fichas de Produtos" },
+  { chave: "valor_estoque",          label: "Valor de Estoque" },
+  { chave: "inventario_geral",       label: "Inventário Geral" },
+  { chave: "funcionarios",           label: "Funcionários" },
+  { chave: "equipes_campo",          label: "Equipes de Campo" },
+  { chave: "frotas_veiculos",        label: "Frotas de Veículos" },
+  { chave: "reposicao_automatica",   label: "Reposição Automática" },
+  { chave: "suprimentos_kobo",       label: "Suprimentos KOBO" },
+  { chave: "solicitacao_compra",     label: "Solicitação de Compra" },
+  { chave: "pedido_compra",          label: "Pedido de Compra" },
+  { chave: "pedido_orcamento",       label: "Pedido de Orçamento" },
+  { chave: "obras_projetos",         label: "Obras & Projetos" },
+  { chave: "catalogo_materiais_obra",label: "Catálogo de Obras" },
+  { chave: "rel_abastecimentos",     label: "Rel. Abastecimentos" },
+  { chave: "fornecedores",           label: "Fornecedores" },
+  { chave: "seguranca_epi",          label: "Segurança & EPI" },
+  { chave: "equipamentos_pesados",   label: "Equipamentos Pesados" },
+  { chave: "debitos_manutencao",     label: "Débitos Manutenção" },
+  { chave: "seguranca_dados",        label: "Segurança de Dados" },
+  { chave: "administracao_usuarios", label: "Administração de Usuários" },
 ];
 
 const NIVEL_COLOR: Record<string, string> = {
@@ -44,9 +70,9 @@ export default function Usuarios() {
   const openEdit   = (u: User) => { setTarget(u); setForm({ ...u }); setModal("edit"); };
   const openSenha  = (u: User) => { setTarget(u); setNovaSenha(""); setModal("senha"); };
 
-  const toggleModulo = (m: string) => setForm((p) => {
+  const toggleModulo = (chave: string) => setForm((p) => {
     const prev = p.modulos ?? [];
-    return { ...p, modulos: prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m] };
+    return { ...p, modulos: prev.includes(chave) ? prev.filter((x) => x !== chave) : [...prev, chave] };
   });
 
   const handleSave = async () => {
@@ -165,6 +191,18 @@ export default function Usuarios() {
                 {NIVEIS.map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
             </div>
+            <div className="col-span-2">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Papel no fluxo SC</label>
+              <select value={String(form.papel ?? "")} onChange={(e) => setForm((p) => ({ ...p, papel: e.target.value }))}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-[#EA6C0A]">
+                <option value="op_manutencao">Operacional Manutenção — abre SCs</option>
+                <option value="admin_manutencao">Admin Manutenção — aprova SCs da equipe</option>
+                <option value="op_suprimentos">Operacional Suprimentos — faz cotação e compra</option>
+                <option value="admin_suprimentos">Admin Suprimentos — aprovação final</option>
+                <option value="almoxarife">Almoxarife — dá entrada de materiais</option>
+                <option value="admin_geral">Administrador Geral — acesso irrestrito</option>
+              </select>
+            </div>
             {modal === "create" && (
               <div className="col-span-2">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Senha *</label>
@@ -178,15 +216,15 @@ export default function Usuarios() {
             <div>
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-2">Módulos Permitidos</label>
               <div className="grid grid-cols-3 gap-1.5">
-                {MODULOS_ALL.map((m) => {
-                  const checked = (form.modulos ?? []).includes(m);
+                {MODULOS_ALL.map(({ chave, label }) => {
+                  const checked = (form.modulos ?? []).includes(chave);
                   return (
-                    <label key={m} className={`flex items-center gap-2 cursor-pointer px-2 py-1.5 rounded-lg border text-xs transition-colors ${checked ? "bg-[#EA6C0A]/10 border-[#EA6C0A]/30 text-[#C75B12] font-semibold" : "bg-slate-50 border-slate-200 text-slate-500"}`}>
-                      <input type="checkbox" checked={checked} onChange={() => toggleModulo(m)} className="hidden" />
+                    <label key={chave} className={`flex items-center gap-2 cursor-pointer px-2 py-1.5 rounded-lg border text-xs transition-colors ${checked ? "bg-[#EA6C0A]/10 border-[#EA6C0A]/30 text-[#C75B12] font-semibold" : "bg-slate-50 border-slate-200 text-slate-500"}`}>
+                      <input type="checkbox" checked={checked} onChange={() => toggleModulo(chave)} className="hidden" />
                       <span className={`w-3 h-3 rounded border flex items-center justify-center ${checked ? "bg-[#EA6C0A] border-[#EA6C0A]" : "border-slate-300"}`}>
                         {checked && <span className="text-white text-[8px] font-bold">✓</span>}
                       </span>
-                      {m}
+                      {label}
                     </label>
                   );
                 })}

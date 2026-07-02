@@ -63,7 +63,8 @@ class UsuarioController extends Controller
         ]);
 
         if (isset($data['modulos'])) {
-            $usuario->modulos()->sync($data['modulos']);
+            $ids = \App\Models\Modulo::whereIn('chave', $data['modulos'])->pluck('id');
+            $usuario->modulos()->sync($ids);
         } else {
             app(PermissaoService::class)->aplicarTemplatePadrao($usuario);
         }
@@ -93,7 +94,8 @@ class UsuarioController extends Controller
         $usuario->update($campos);
 
         if (isset($data['modulos'])) {
-            $usuario->modulos()->sync($data['modulos']);
+            $ids = \App\Models\Modulo::whereIn('chave', $data['modulos'])->pluck('id');
+            $usuario->modulos()->sync($ids);
         }
 
         return response()->json([
