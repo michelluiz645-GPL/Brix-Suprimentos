@@ -2,6 +2,8 @@ import React, { useState, useMemo, useEffect, useCallback } from "react";
 import PageHeader from "@/components/PageHeader";
 import Modal from "@/components/Modal";
 import { api } from "@/services/api";
+import { useToast } from "@/hooks/useToast";
+import ToastContainer from "@/components/Toast";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 type Urgencia = "CRITICA" | "ALTA" | "MEDIA" | "BAIXA";
@@ -114,6 +116,7 @@ export default function PedidosOrcamento({ user, setor }: Props) {
   const isManut = setor === "MANUTENCAO";
   const isAdmin = user.nivel === "ADMIN";
 
+  const toast = useToast();
   const [pedidos, setPedidos]   = useState<Pedido[]>([]);
   const [loading, setLoading]   = useState(true);
   const [salvando, setSalvando] = useState(false);
@@ -211,8 +214,19 @@ export default function PedidosOrcamento({ user, setor }: Props) {
 
   // Criar novo pedido — persiste no backend
   const handleCriar = async () => {
-    if (!form.destino.trim()) return;
-    if (form.itens.some(i => !i.descricao.trim() || i.quantidade <= 0)) return;
+    if (!form.destino.trim()) {
+      toast.error("Selecione o destino do pedido.");
+      return;
+    }
+    if (form.itens.length === 0) {
+      toast.error("Adicione ao menos um item.");
+      return;
+    }
+    const itemInvalido = form.itens.findIndex(i => !i.descricao.trim() || i.quantidade <= 0);
+    if (itemInvalido >= 0) {
+      toast.error(`Item ${itemInvalido + 1}: preencha a descrição e quantidade.`);
+      return;
+    }
     const sc = gerarNumeroSC(pedidos.length);
     const timeline = criarTimeline(user.nome);
     setSalvando(true);
@@ -227,8 +241,9 @@ export default function PedidosOrcamento({ user, setor }: Props) {
       await carregar();
       setShowForm(false);
       setForm({ urgencia:"MEDIA", tipo_destino:"FROTA", destino:"", itens:[{...ITEM_VAZIO}] });
+      toast.success("Pedido enviado para o Suprimentos!");
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Erro ao criar pedido.");
+      toast.error(err instanceof Error ? err.message : "Erro ao criar pedido.");
     } finally { setSalvando(false); }
   };
 
@@ -268,6 +283,7 @@ export default function PedidosOrcamento({ user, setor }: Props) {
 
   return (
     <div className="space-y-5">
+      <ToastContainer toasts={toast.toasts} onDismiss={toast.dismiss} />
       <PageHeader title="Pedidos de Orçamento" subtitle="Solicitações de Manutenção para Suprimentos"
         action={isManut ? (
           <button onClick={()=>setShowForm(true)}
