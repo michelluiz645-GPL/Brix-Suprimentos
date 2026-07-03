@@ -61,14 +61,12 @@ const MENUS_BY_SECTOR: Record<string, string[]> = {
     "Devolução", "Entregas Pend.", "Combustíveis", "Produtos",
     "Valor Estoque", "Inventário", "Funcionários", "Equipes", "Frotas",
     "Reposição Auto.", "Ped. Orçamento",
-    "Fila Cotação", "Registrar Compra", "Fila Aprovação SC", "Entradas SC",
     "Suprimentos Kobo", "Backup", "Usuários",
   ],
   ALMOXARIFADO_OPERADOR: [
     "Dashboard", "Consultar", "Entrada", "Saída", "Histórico Cupons",
     "Devolução", "Entregas Pend.", "Combustíveis", "Produtos",
     "Funcionários", "Equipes", "Frotas", "Reposição Auto.", "Ped. Orçamento",
-    "Fila Cotação", "Registrar Compra", "Entradas SC",
   ],
   ENGENHARIA_ADMIN: [
     "Dashboard", "Obras & Projetos", "Catálogo Obra", "Fornecedores",
@@ -81,12 +79,10 @@ const MENUS_BY_SECTOR: Record<string, string[]> = {
     "Débitos Manut.", "Suprimentos Kobo", "Rel. Abastecimento",
   ],
   MANUTENCAO_ADMIN: [
-    "Dashboard", "Nova SC", "Meus Pedidos SC", "Fila Aprovação SC",
-    "Ped. Orçamento", "EPI", "Equipamentos", "Débitos Manut.",
+    "Dashboard", "Ped. Orçamento", "EPI", "Equipamentos", "Débitos Manut.",
   ],
   MANUTENCAO_OPERADOR: [
-    "Dashboard", "Nova SC", "Meus Pedidos SC", "Ped. Orçamento",
-    "EPI", "Equipamentos", "Débitos Manut.",
+    "Dashboard", "Ped. Orçamento", "EPI", "Equipamentos", "Débitos Manut.",
   ],
 };
 
