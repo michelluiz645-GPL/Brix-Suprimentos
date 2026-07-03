@@ -76,6 +76,7 @@ class AuthController extends Controller
             'nome' => $user->nome,
             'login' => $user->login,
             'nivel' => $user->nivel,
+            'papel' => $user->papel,
             'setor' => $user->setor->codigo,
             'modulos' => $user->modulos->pluck('chave'),
         ];
