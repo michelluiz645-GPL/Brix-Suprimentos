@@ -77,6 +77,12 @@ export const api = {
     saldo: ()                => request<object>("/combustiveis/saldo"),
   },
 
+  pedidosOrcamento: {
+    list:         ()                    => request<object[]>("/pedidos-orcamento"),
+    create:       (data: object)        => request<object>("/pedidos-orcamento", { method: "POST", body: JSON.stringify(data) }),
+    updateStatus: (id: number, data: object) => request<object>(`/pedidos-orcamento/${id}/status`, { method: "PATCH", body: JSON.stringify(data) }),
+  },
+
   funcionarios: {
     list: (params?: string)  => request<object>(`/funcionarios${params ? `?${params}` : ""}`),
     get: (id: number)        => request<object>(`/funcionarios/${id}`),

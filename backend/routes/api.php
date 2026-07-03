@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\PedidoOrcamentoController;
 use App\Http\Controllers\Api\SolicitacaoCompraController;
 use App\Http\Controllers\Api\UsuarioController;
 use Illuminate\Support\Facades\Route;
@@ -17,6 +18,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/usuarios',                  [UsuarioController::class, 'store']);
     Route::put('/usuarios/{usuario}',         [UsuarioController::class, 'update']);
     Route::patch('/usuarios/{usuario}/senha', [UsuarioController::class, 'resetSenha']);
+
+    // Pedidos de Orçamento (Manutenção → Suprimentos)
+    Route::get('/pedidos-orcamento',                              [PedidoOrcamentoController::class, 'index']);
+    Route::post('/pedidos-orcamento',                             [PedidoOrcamentoController::class, 'store']);
+    Route::patch('/pedidos-orcamento/{pedidoOrcamento}/status',   [PedidoOrcamentoController::class, 'updateStatus']);
 
     // RF-021 — Solicitação de Compra (SC)
     Route::get('/sc',  [SolicitacaoCompraController::class, 'index']);

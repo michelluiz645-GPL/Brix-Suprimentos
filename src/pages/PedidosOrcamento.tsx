@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import PageHeader from "@/components/PageHeader";
 import Modal from "@/components/Modal";
+import { api } from "@/services/api";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 type Urgencia = "CRITICA" | "ALTA" | "MEDIA" | "BAIXA";
@@ -94,8 +95,9 @@ const criarTimeline = (solicitante: string): TimelineStep[] =>
     estado: i === 0 ? "atual" : "futuro",
   }));
 
-// ─── Estado inicial vazio — pedidos criados em tempo real ────────────────────
-const PEDIDOS_MOCK: Pedido[] = [];
+// ─── Numeração sequencial local (fallback enquanto carrega) ──────────────────
+const gerarNumeroSC = (total: number) => `SC-2026-${String(total + 1).padStart(3, "0")}`;
+
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 interface Props {
@@ -112,11 +114,23 @@ export default function PedidosOrcamento({ user, setor }: Props) {
   const isManut = setor === "MANUTENCAO";
   const isAdmin = user.nivel === "ADMIN";
 
-  const [pedidos, setPedidos] = useState<Pedido[]>(PEDIDOS_MOCK);
-  const [filtros, setFiltros] = useState({ sc:"", setor2:"", equipamento:"", dataIni:"", dataFim:"", urgencia:"", status:"" });
-  const [sort, setSort]       = useState<{key:SortKey;asc:boolean}>({key:"data",asc:false});
-  const [drawer, setDrawer]   = useState<Pedido|null>(null);
+  const [pedidos, setPedidos]   = useState<Pedido[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [salvando, setSalvando] = useState(false);
+  const [filtros, setFiltros]   = useState({ sc:"", setor2:"", equipamento:"", dataIni:"", dataFim:"", urgencia:"", status:"" });
+  const [sort, setSort]         = useState<{key:SortKey;asc:boolean}>({key:"data",asc:false});
+  const [drawer, setDrawer]     = useState<Pedido|null>(null);
   const [showForm, setShowForm] = useState(false);
+
+  const carregar = useCallback(() => {
+    setLoading(true);
+    api.pedidosOrcamento.list()
+      .then(r => setPedidos(Array.isArray(r) ? r as Pedido[] : []))
+      .catch(() => setPedidos([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { carregar(); }, [carregar]);
 
   // Formulário novo pedido
   const [form, setForm] = useState({
@@ -177,30 +191,45 @@ export default function PedidosOrcamento({ user, setor }: Props) {
   const toggleSort = (key:SortKey) =>
     setSort(p=>p.key===key?{key,asc:!p.asc}:{key,asc:true});
 
-  // Ação de transição de status
-  const executarAcao = (pedido: Pedido, novoStatus: Status) => {
+  // Ação de transição de status — persiste no backend
+  const executarAcao = async (pedido: Pedido, novoStatus: Status) => {
     const updated = transicao(pedido, novoStatus, user.nome);
-    setPedidos(prev=>prev.map(p=>p.id===updated.id?updated:p));
-    setDrawer(updated);
+    try {
+      const salvo = await api.pedidosOrcamento.updateStatus(pedido.id, {
+        status: updated.status,
+        timeline: updated.timeline,
+        valor_total: updated.valor_total,
+      }) as Pedido;
+      setPedidos(prev => prev.map(p => p.id === salvo.id ? salvo : p));
+      setDrawer(salvo);
+    } catch {
+      // fallback local se API falhar
+      setPedidos(prev => prev.map(p => p.id === updated.id ? updated : p));
+      setDrawer(updated);
+    }
   };
 
-  // Criar novo pedido
-  const handleCriar = () => {
+  // Criar novo pedido — persiste no backend
+  const handleCriar = async () => {
     if (!form.destino.trim()) return;
-    if (form.itens.some(i=>!i.descricao.trim()||i.quantidade<=0)) return;
-    const nextId = pedidos.length > 0 ? Math.max(...pedidos.map(p=>p.id))+1 : 1;
-    const sc = `SC-2026-${String(nextId).padStart(3,"0")}`;
-    const novo: Pedido = {
-      id: nextId, numero_sc: sc, data: todayISO(),
-      setor: "MANUTENCAO", destino: form.destino,
-      tipo_destino: form.tipo_destino, urgencia: form.urgencia,
-      status: "PENDENTE", itens: form.itens, valor_total: 0,
-      solicitante: user.nome,
-      timeline: criarTimeline(user.nome),
-    };
-    setPedidos(prev=>[novo,...prev]);
-    setShowForm(false);
-    setForm({urgencia:"MEDIA",tipo_destino:"FROTA",destino:"",itens:[{...ITEM_VAZIO}]});
+    if (form.itens.some(i => !i.descricao.trim() || i.quantidade <= 0)) return;
+    const sc = gerarNumeroSC(pedidos.length);
+    const timeline = criarTimeline(user.nome);
+    setSalvando(true);
+    try {
+      await api.pedidosOrcamento.create({
+        numero_sc: sc, data: todayISO(),
+        setor: "MANUTENCAO", destino: form.destino,
+        tipo_destino: form.tipo_destino, urgencia: form.urgencia,
+        itens: form.itens, valor_total: 0,
+        solicitante: user.nome, timeline,
+      });
+      await carregar();
+      setShowForm(false);
+      setForm({ urgencia:"MEDIA", tipo_destino:"FROTA", destino:"", itens:[{...ITEM_VAZIO}] });
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Erro ao criar pedido.");
+    } finally { setSalvando(false); }
   };
 
   const addItem    = () => setForm(p=>({...p,itens:[...p.itens,{...ITEM_VAZIO}]}));
@@ -327,7 +356,9 @@ export default function PedidosOrcamento({ user, setor }: Props) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {filtrados.length===0
+              {loading
+                ? <tr><td colSpan={8} className="p-10 text-center text-slate-400">Carregando pedidos...</td></tr>
+                : filtrados.length===0
                 ? <tr><td colSpan={8} className="p-10 text-center text-slate-400">Nenhum pedido encontrado.</td></tr>
                 : filtrados.map(p=>{
                   const pct = PROGRESSO[p.status];
@@ -437,9 +468,9 @@ export default function PedidosOrcamento({ user, setor }: Props) {
 
           <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
             <button onClick={()=>setShowForm(false)} className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200">Cancelar</button>
-            <button onClick={handleCriar}
-              className="px-6 py-2 text-xs font-bold text-white rounded-lg bg-gradient-to-r from-[#C75B12] to-[#EA6C0A] hover:-translate-y-0.5 transition-all">
-              Enviar para Suprimentos
+            <button onClick={handleCriar} disabled={salvando}
+              className="px-6 py-2 text-xs font-bold text-white rounded-lg bg-gradient-to-r from-[#C75B12] to-[#EA6C0A] hover:-translate-y-0.5 transition-all disabled:opacity-60">
+              {salvando ? "Enviando..." : "Enviar para Suprimentos"}
             </button>
           </div>
         </div>
