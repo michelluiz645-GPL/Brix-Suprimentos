@@ -116,7 +116,22 @@ const transicao = (pedido: Pedido, novoStatus: Status, feito_por: string, extra?
   return { ...pedido, status: novoStatus, timeline: tl, ...(extra ?? {}) };
 };
 
-const gerarNumeroSC = (total: number) => `SC-${new Date().getFullYear()}-${String(total + 1).padStart(3, "0")}`;
+const LS_KEY = "geplan_pedidos_orcamento";
+const lsCarregar = (): Pedido[] => {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) ?? "[]"); } catch { return []; }
+};
+const lsSalvar = (lista: Pedido[]) => {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(lista)); } catch { /* sem espaço */ }
+};
+
+const gerarNumeroSC = (lista: Pedido[]) => {
+  const ano = new Date().getFullYear();
+  const usados = lista.map(p => p.numero_sc).filter(n => n.startsWith(`SC-${ano}-`));
+  let seq = usados.length + 1;
+  let candidato = `SC-${ano}-${String(seq).padStart(3,"0")}`;
+  while (usados.includes(candidato)) { seq++; candidato = `SC-${ano}-${String(seq).padStart(3,"0")}`; }
+  return candidato;
+};
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function PedidosOrcamento({ user, setor }: Props) {
@@ -131,7 +146,7 @@ export default function PedidosOrcamento({ user, setor }: Props) {
   const abas = ABAS_POR_PAPEL[papel] ?? ["Solicitações"];
 
   const toast = useToast();
-  const [pedidos,  setPedidos]  = useState<Pedido[]>([]);
+  const [pedidos,  setPedidos]  = useState<Pedido[]>(lsCarregar);
   const [loading,  setLoading]  = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState(abas[0]);
@@ -148,8 +163,16 @@ export default function PedidosOrcamento({ user, setor }: Props) {
   const carregar = useCallback(() => {
     setLoading(true);
     api.pedidosOrcamento.list()
-      .then(r => setPedidos(Array.isArray(r) ? r as Pedido[] : []))
-      .catch(() => setPedidos([]))
+      .then(r => {
+        const lista = Array.isArray(r) ? r as Pedido[] : [];
+        setPedidos(lista);
+        lsSalvar(lista);
+      })
+      .catch(() => {
+        // mantém o que está no localStorage — não apaga os dados da tela
+        const cache = lsCarregar();
+        if (cache.length > 0) setPedidos(cache);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -192,7 +215,11 @@ export default function PedidosOrcamento({ user, setor }: Props) {
       const salvo = await api.pedidosOrcamento.updateStatus(pedido.id, {
         status: updated.status, timeline: updated.timeline, valor_total: updated.valor_total,
       }) as Pedido;
-      setPedidos(prev => prev.map(p => p.id === salvo.id ? salvo : p));
+      setPedidos(prev => {
+        const nova = prev.map(p => p.id === salvo.id ? salvo : p);
+        lsSalvar(nova);
+        return nova;
+      });
       setDrawer(d => d?.id === salvo.id ? salvo : d);
       setAcaoModal(null);
       setAcaoValor("");
@@ -233,7 +260,7 @@ export default function PedidosOrcamento({ user, setor }: Props) {
     if (!form.destino.trim()) { toast.error("Selecione o destino do pedido."); return; }
     const invalido = form.itens.findIndex(i => !i.descricao.trim() || i.quantidade <= 0);
     if (invalido >= 0) { toast.error(`Item ${invalido + 1}: preencha a descrição e quantidade.`); return; }
-    const sc = gerarNumeroSC(pedidos.length);
+    const sc = gerarNumeroSC(pedidos);
     setSalvando(true);
     try {
       await api.pedidosOrcamento.create({
