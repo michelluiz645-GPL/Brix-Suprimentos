@@ -8,6 +8,27 @@ services:
     working_dir: /var/www/backend
     env_file:
       - .env
+    volumes:
+      - geplan_anexos_prod:/var/www/backend/storage/app/anexos
+      - geplan_backups_prod:/var/www/backend/storage/app/backups
+    depends_on:
+      - db
+    networks:
+      - geplan
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.prod
+    container_name: geplan_scheduler_prod
+    restart: always
+    working_dir: /var/www/backend
+    command: php artisan schedule:work
+    env_file:
+      - .env
+    volumes:
+      - geplan_anexos_prod:/var/www/backend/storage/app/anexos
+      - geplan_backups_prod:/var/www/backend/storage/app/backups
     depends_on:
       - db
     networks:
@@ -37,8 +58,11 @@ services:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       MYSQL_USER: ${DB_USERNAME}
       MYSQL_PASSWORD: ${DB_PASSWORD}
+      DB_BACKUP_USERNAME: ${DB_BACKUP_USERNAME}
+      DB_BACKUP_PASSWORD: ${DB_BACKUP_PASSWORD}
     volumes:
       - geplan_db_data_prod:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
     networks:
       - geplan
 
@@ -48,3 +72,5 @@ networks:
 
 volumes:
   geplan_db_data_prod:
+  geplan_anexos_prod:
+  geplan_backups_prod:

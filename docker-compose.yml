@@ -15,6 +15,23 @@ services:
     networks:
       - geplan
 
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: geplan_scheduler
+    restart: unless-stopped
+    working_dir: /var/www/backend
+    command: php artisan schedule:work
+    volumes:
+      - ./backend:/var/www/backend
+    environment:
+      - APP_ENV=local
+    depends_on:
+      - db
+    networks:
+      - geplan
+
   webserver:
     image: nginx:1.27-alpine
     container_name: geplan_nginx
@@ -54,10 +71,13 @@ services:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
       MYSQL_USER: ${DB_USERNAME:-geplan}
       MYSQL_PASSWORD: ${DB_PASSWORD:-geplan}
+      DB_BACKUP_USERNAME: ${DB_BACKUP_USERNAME:-geplan_backup}
+      DB_BACKUP_PASSWORD: ${DB_BACKUP_PASSWORD:?defina DB_BACKUP_PASSWORD no .env}
     ports:
       - "3307:3306"
     volumes:
       - geplan_db_data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
     networks:
       - geplan
 

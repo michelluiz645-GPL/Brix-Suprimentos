@@ -1,4 +1,4 @@
-.PHONY: up up-prod down migrate seed fresh deploy send db tinker thinker shell install build-frontend key-generate logs
+.PHONY: up up-prod down migrate seed fresh deploy send db tinker thinker shell install build-frontend key-generate logs backup
 
 # ── Ambiente de desenvolvimento ──────────────────────────────────────────────
 up:
@@ -25,6 +25,9 @@ fresh:
 
 db:
 	docker compose exec db mysql -u root -p geplan
+
+backup:
+	docker compose exec app php artisan backup:database
 
 # ── Laravel ───────────────────────────────────────────────────────────────────
 tinker:

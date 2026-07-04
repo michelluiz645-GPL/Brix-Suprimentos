@@ -60,6 +60,22 @@ return [
             'report' => false,
         ],
 
+        // Anexos organizados por setor/segmento (RF-005, RF-006, RF-021, RF-022, RF-023)
+        'anexos' => [
+            'driver' => 'local',
+            'root' => storage_path('app/anexos'),
+            'throw' => false,
+            'report' => false,
+        ],
+
+        // Backups automáticos do banco de dados (RF-026)
+        'backups' => [
+            'driver' => 'local',
+            'root' => storage_path('app/backups'),
+            'throw' => false,
+            'report' => false,
+        ],
+
     ],
 
     /*
