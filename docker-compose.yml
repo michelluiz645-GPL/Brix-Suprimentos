@@ -1,29 +1,69 @@
 services:
-  frontend:
+  app:
     build:
       context: .
-      dockerfile: docker/Dockerfile.frontend
+      dockerfile: docker/Dockerfile
+    container_name: geplan_app
+    restart: unless-stopped
+    working_dir: /var/www/backend
+    volumes:
+      - ./backend:/var/www/backend
+    environment:
+      - APP_ENV=local
+    depends_on:
+      - db
+    networks:
+      - geplan
+
+  webserver:
+    image: nginx:1.27-alpine
+    container_name: geplan_nginx
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./backend:/var/www/backend
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+    networks:
+      - geplan
+
+  frontend:
+    image: node:20-alpine
+    container_name: geplan_frontend
+    restart: unless-stopped
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    volumes:
+      - ./:/app
+      - /app/node_modules
     ports:
       - "5173:5173"
-    volumes:
-      - .:/app
-      - /app/node_modules
     environment:
-      - NODE_ENV=development
-    depends_on:
-      - backend
+      - VITE_API_URL=http://localhost:8080/api
+    networks:
+      - geplan
 
-  backend:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.backend
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./backend:/app/backend
-      - ./database:/app/database
-    env_file:
-      - .env
-    environment:
-      - NODE_ENV=development
+  db:
+    image: mysql:8.0
+    container_name: geplan_db
     restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: geplan
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
+      MYSQL_USER: ${DB_USERNAME:-geplan}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-geplan}
+    ports:
+      - "3307:3306"
+    volumes:
+      - geplan_db_data:/var/lib/mysql
+    networks:
+      - geplan
+
+networks:
+  geplan:
+    driver: bridge
+
+volumes:
+  geplan_db_data:
