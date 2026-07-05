@@ -70,29 +70,54 @@ class PedidoOrcamentoService
         $this->avancarTimeline($pedido, $statusAnterior, $responsavel->nome);
     }
 
+    /**
+     * @param array{fornecedores: array<int, array{nome: string, prazo_entrega: ?string, forma_pagamento: ?string}>, itens: array<int, array{descricao: string, precos: array<int, float>}>} $dados
+     */
     public function enviarParaAprovacaoManutencao(PedidoOrcamento $pedido, array $dados, User $responsavel): void
     {
         $statusAnterior = $pedido->status;
 
         $pedido->update([
-            'status'        => 'AGUARDANDO_APROVACAO_MANUTENCAO',
-            'valor_total'   => $dados['valor_total'],
-            'cotado_por_id' => $responsavel->id,
-            'data_cotacao'  => now(),
+            'status'               => 'AGUARDANDO_APROVACAO_MANUTENCAO',
+            'cotacao_fornecedores' => $dados['fornecedores'],
+            'cotacao_itens'        => $dados['itens'],
+            'cotado_por_id'        => $responsavel->id,
+            'data_cotacao'         => now(),
         ]);
 
         $this->avancarTimeline($pedido, $statusAnterior, $responsavel->nome);
         $this->notificar(['admin_manutencao'], "Pedido {$pedido->numero_sc} aguardando aprovação da Manutenção.");
     }
 
-    public function aprovarManutencao(PedidoOrcamento $pedido, User $aprovador): void
+    /**
+     * A Manutenção escolhe UM fornecedor vencedor entre os 3 cotados — o
+     * valor_total, prazo de entrega e forma de pagamento definitivos do
+     * pedido vêm desse fornecedor escolhido (soma dos preços dele em cada
+     * item do comparativo).
+     *
+     * @throws \InvalidArgumentException se o fornecedor não estiver entre os cotados
+     */
+    public function aprovarManutencao(PedidoOrcamento $pedido, User $aprovador, string $fornecedorEscolhido): void
     {
         $statusAnterior = $pedido->status;
+        $fornecedores   = $pedido->cotacao_fornecedores ?? [];
+
+        $indice = collect($fornecedores)->search(fn (array $f) => $f['nome'] === $fornecedorEscolhido);
+
+        if ($indice === false) {
+            throw new \InvalidArgumentException('Fornecedor escolhido não faz parte desta cotação.');
+        }
+
+        $valorTotal = collect($pedido->cotacao_itens ?? [])->sum(fn (array $item) => (float) ($item['precos'][$indice] ?? 0));
 
         $pedido->update([
             'status'                     => 'AGUARDANDO_APROVACAO_COMPRA',
             'aprovado_manutencao_por_id' => $aprovador->id,
             'data_aprovacao_manutencao'  => now(),
+            'fornecedor_escolhido'       => $fornecedorEscolhido,
+            'prazo_entrega_escolhido'    => $fornecedores[$indice]['prazo_entrega'] ?? null,
+            'forma_pagamento_escolhida'  => $fornecedores[$indice]['forma_pagamento'] ?? null,
+            'valor_total'                => $valorTotal,
         ]);
 
         $this->avancarTimeline($pedido, $statusAnterior, $aprovador->nome);

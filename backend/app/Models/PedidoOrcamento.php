@@ -16,6 +16,8 @@ class PedidoOrcamento extends Model
         'numero_sc', 'data', 'setor', 'solicitante_id',
         'destino', 'tipo_destino', 'urgencia', 'status',
         'itens', 'valor_total',
+        'cotacao_fornecedores', 'cotacao_itens',
+        'fornecedor_escolhido', 'prazo_entrega_escolhido', 'forma_pagamento_escolhida',
         'data_cotacao', 'cotado_por_id',
         'data_aprovacao_manutencao', 'aprovado_manutencao_por_id',
         'data_aprovacao_compra', 'aprovado_compra_por_id',
@@ -27,6 +29,8 @@ class PedidoOrcamento extends Model
     protected $casts = [
         'itens'    => 'array',
         'timeline' => 'array',
+        'cotacao_fornecedores' => 'array',
+        'cotacao_itens' => 'array',
         'data'     => 'date:Y-m-d',
         'data_prevista_recebimento' => 'date:Y-m-d',
         'data_cotacao' => 'datetime',

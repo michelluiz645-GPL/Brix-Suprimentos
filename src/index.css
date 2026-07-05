@@ -24,3 +24,23 @@ body {
 ::-webkit-scrollbar-track  { background: transparent; }
 ::-webkit-scrollbar-thumb  { background: #cbd5e1; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* Impressão de documentos (PDF via "Salvar como PDF" do navegador).
+   Qualquer tela usa: envolve o conteúdo imprimível numa div .print-area
+   (mantida fora da visualização normal com .print-only) e chama
+   window.print() — o resto da aplicação some, só a área impressa aparece. */
+@media print {
+  body * { visibility: hidden; }
+  .print-area, .print-area * { visibility: visible; }
+  .print-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+  .no-print { display: none !important; }
+}
+.print-only { display: none; }
+@media print {
+  .print-only { display: block; }
+}

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\AprovarManutencaoPedidoOrcamentoRequest;
 use App\Http\Requests\CriarPedidoOrcamentoRequest;
 use App\Http\Requests\EnviarAprovacaoManutencaoRequest;
 use App\Http\Requests\RegistrarCompraPedidoOrcamentoRequest;
@@ -57,13 +58,17 @@ class PedidoOrcamentoController extends Controller
         return response()->json(['data' => $this->serialize($pedidoOrcamento->fresh()), 'message' => 'Enviado para aprovação da Manutenção.']);
     }
 
-    public function aprovarManutencao(Request $request, PedidoOrcamento $pedidoOrcamento): JsonResponse
+    public function aprovarManutencao(AprovarManutencaoPedidoOrcamentoRequest $request, PedidoOrcamento $pedidoOrcamento): JsonResponse
     {
         if ($erro = $this->garantirStatus($pedidoOrcamento, 'AGUARDANDO_APROVACAO_MANUTENCAO')) {
             return $erro;
         }
 
-        $this->service->aprovarManutencao($pedidoOrcamento, $request->user());
+        try {
+            $this->service->aprovarManutencao($pedidoOrcamento, $request->user(), $request->validated('fornecedor_escolhido'));
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['data' => null, 'message' => $e->getMessage()], 422);
+        }
 
         return response()->json(['data' => $this->serialize($pedidoOrcamento->fresh()), 'message' => 'Aprovado pela Manutenção.']);
     }
@@ -162,11 +167,17 @@ class PedidoOrcamentoController extends Controller
             'valor_total'  => (float) $p->valor_total,
             'timeline'     => $p->timeline,
 
+            'cotacao_fornecedores' => $p->cotacao_fornecedores,
+            'cotacao_itens'        => $p->cotacao_itens,
+
             'data_cotacao' => $p->data_cotacao?->format('d/m/Y H:i'),
             'cotado_por'   => $p->cotadoPor?->nome,
 
             'data_aprovacao_manutencao' => $p->data_aprovacao_manutencao?->format('d/m/Y H:i'),
             'aprovado_manutencao_por'   => $p->aprovadoManutencaoPor?->nome,
+            'fornecedor_escolhido'      => $p->fornecedor_escolhido,
+            'prazo_entrega_escolhido'   => $p->prazo_entrega_escolhido,
+            'forma_pagamento_escolhida' => $p->forma_pagamento_escolhida,
 
             'data_aprovacao_compra' => $p->data_aprovacao_compra?->format('d/m/Y H:i'),
             'aprovado_compra_por'   => $p->aprovadoCompraPor?->nome,
