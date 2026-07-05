@@ -5,6 +5,7 @@ import { api } from "@/services/api";
 import { useToast } from "@/hooks/useToast";
 import ToastContainer from "@/components/Toast";
 import type { ResponsabilidadePedidoOrcamento } from "@/types";
+import ComparativoCotacao, { type Fornecedor, type ItemComparativo } from "./PedidosOrcamento/ComparativoCotacao";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 type Urgencia    = "CRITICA" | "ALTA" | "MEDIA" | "BAIXA";
@@ -12,7 +13,7 @@ type Status      =
   | "PENDENTE" | "COTANDO" | "AGUARDANDO_APROVACAO_MANUTENCAO" | "AGUARDANDO_APROVACAO_COMPRA"
   | "APROVADO" | "EM_TRANSITO" | "CONCLUIDO" | "REJEITADO";
 type TipoDestino = "FROTA" | "OBRA" | "EQUIPAMENTO";
-type TipoAcao    = "cotacao" | "aprovar_manutencao" | "aprovar_compra" | "rejeitar" | "comprar" | "receber" | null;
+type TipoAcao    = "aprovar_compra" | "rejeitar" | "comprar" | "receber" | null;
 
 interface Item { descricao: string; quantidade: number; unidade: string; }
 interface TimelineStep {
@@ -26,7 +27,12 @@ interface Pedido {
   itens: Item[]; valor_total: number; solicitante: string;
   timeline: TimelineStep[];
   cotado_por?: string | null;
+  cotacao_fornecedores?: Fornecedor[] | null;
+  cotacao_itens?: ItemComparativo[] | null;
   aprovado_manutencao_por?: string | null;
+  fornecedor_escolhido?: string | null;
+  prazo_entrega_escolhido?: string | null;
+  forma_pagamento_escolhida?: string | null;
   aprovado_compra_por?: string | null;
   comprado_por?: string | null;
   data_prevista_recebimento?: string | null;
@@ -76,7 +82,8 @@ const STATUS_DA_ABA: Record<string, Status[]> = {
   "Aprovar Orçamento":  ["AGUARDANDO_APROVACAO_MANUTENCAO"],
   "Aprovar Compra":     ["AGUARDANDO_APROVACAO_COMPRA"],
   "Aprovadas":          ["APROVADO"],
-  "Em Trânsito":        ["EM_TRANSITO", "CONCLUIDO"],
+  "Em Trânsito":        ["EM_TRANSITO"],
+  "Concluído":          ["CONCLUIDO"],
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -109,16 +116,20 @@ export default function PedidosOrcamento({ user, setor }: Props) {
   // "Confirmar Recebimento" continua gated por papel/setor, como já era.
   const podeConfirmarRecebimento = papel === "op_manutencao" || papel === "admin_manutencao" || papel === "almoxarife" || papel === "admin_geral";
 
+  // Pendentes/Aprovadas/Em Trânsito/Concluído são um painel geral, somente
+  // leitura, visível para qualquer um com acesso ao módulo — só as filas de
+  // ação (Em Cotação, Aprovar Orçamento, Aprovar Compra) continuam restritas
+  // a quem tem a responsabilidade correspondente.
   const abas = useMemo(() => {
     const lista: string[] = [];
     if (temResp("solicitante"))           lista.push("Solicitações");
-    if (temResp("cotador"))                lista.push("Recebidas", "Em Cotação");
+    lista.push("Recebidas");
+    if (temResp("cotador"))                lista.push("Em Cotação");
     if (temResp("aprovador_manutencao"))    lista.push("Aprovar Orçamento");
     if (temResp("aprovador_suprimentos"))   lista.push("Aprovar Compra");
-    if (temResp("comprador"))               lista.push("Aprovadas");
-    if (podeConfirmarRecebimento)            lista.push("Em Trânsito");
-    return lista.length ? lista : ["Solicitações"];
-  }, [temResp, podeConfirmarRecebimento]);
+    lista.push("Aprovadas", "Em Trânsito", "Concluído");
+    return lista;
+  }, [temResp]);
 
   const toast = useToast();
   const [pedidos,  setPedidos]  = useState<Pedido[]>(lsCarregar);
@@ -129,6 +140,10 @@ export default function PedidosOrcamento({ user, setor }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [acaoModal,  setAcaoModal]  = useState<{ pedido: Pedido; tipo: TipoAcao } | null>(null);
   const [acaoValor,  setAcaoValor]  = useState("");
+  const [comparativoModal, setComparativoModal] = useState<{ pedido: Pedido; modo: "editar" | "aprovar" | "visualizar" } | null>(null);
+  const [filtroBusca,   setFiltroBusca]   = useState("");
+  const [filtroDataDe,  setFiltroDataDe]  = useState("");
+  const [filtroDataAte, setFiltroDataAte] = useState("");
 
   const [form, setForm] = useState({
     urgencia: "MEDIA" as Urgencia, tipo_destino: "FROTA" as TipoDestino,
@@ -153,42 +168,59 @@ export default function PedidosOrcamento({ user, setor }: Props) {
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  // Pedidos filtrados pela aba ativa. Em "Solicitações", quem só tem a
-  // responsabilidade de solicitante acompanha suas próprias solicitações em
-  // qualquer status (do PENDENTE ao CONCLUIDO/REJEITADO); quem também tem
-  // outra responsabilidade (cotador, aprovador etc.) já vê a fila inteira
-  // por padrão nas outras abas, então aqui vê todos os pedidos.
-  const pedidosAba = useMemo(() => {
-    const statusFiltro = STATUS_DA_ABA[abaAtiva] ?? [];
-    if (abaAtiva === "Solicitações") {
-      const apenasSolicitante = temResp("solicitante") && !nivelAdmin &&
-        !temResp("cotador") && !temResp("aprovador_manutencao") && !temResp("aprovador_suprimentos") && !temResp("comprador");
-      if (apenasSolicitante)
-        return pedidos.filter(p => p.solicitante === user.nome);
-      return pedidos;
-    }
-    return pedidos.filter(p => statusFiltro.includes(p.status));
-  }, [pedidos, abaAtiva, temResp, nivelAdmin, user.nome]);
+  // Suprimentos (Almoxarifado) atende pedidos de todos os setores solicitantes
+  // — só quem está vendo a partir de um setor solicitante (Manutenção, e no
+  // futuro Engenharia) fica restrito a enxergar apenas os pedidos do próprio
+  // setor.
+  const pedidosVisiveis = useMemo(
+    () => setor === "ALMOXARIFADO" ? pedidos : pedidos.filter(p => p.setor === setor),
+    [pedidos, setor]
+  );
 
-  // Badge de contagem por aba
-  const contagem = useCallback((aba: string) => {
-    const statusFiltro = STATUS_DA_ABA[aba] ?? [];
+  // Lista-base de uma aba, antes dos filtros de busca/data. Em "Solicitações",
+  // quem só tem a responsabilidade de solicitante acompanha suas próprias
+  // solicitações em qualquer status (do PENDENTE ao CONCLUIDO/REJEITADO);
+  // quem também tem outra responsabilidade já vê a fila inteira por padrão.
+  const baseParaAba = useCallback((aba: string): Pedido[] => {
     if (aba === "Solicitações") {
       const apenasSolicitante = temResp("solicitante") && !nivelAdmin &&
         !temResp("cotador") && !temResp("aprovador_manutencao") && !temResp("aprovador_suprimentos") && !temResp("comprador");
-      if (apenasSolicitante) return pedidos.filter(p => p.solicitante === user.nome).length;
-      return pedidos.length;
+      return apenasSolicitante ? pedidosVisiveis.filter(p => p.solicitante === user.nome) : pedidosVisiveis;
     }
-    return pedidos.filter(p => statusFiltro.includes(p.status)).length;
-  }, [pedidos, temResp, nivelAdmin, user.nome]);
+    const statusFiltro = STATUS_DA_ABA[aba] ?? [];
+    return pedidosVisiveis.filter(p => statusFiltro.includes(p.status));
+  }, [pedidosVisiveis, temResp, nivelAdmin, user.nome]);
 
-  // KPIs globais
+  // Busca por frota/obra/equipamento (destino) ou nº da SC, e filtro por período
+  const aplicarFiltros = useCallback((lista: Pedido[]) => {
+    let r = lista;
+    if (filtroBusca.trim()) {
+      const q = filtroBusca.trim().toLowerCase();
+      r = r.filter(p => p.destino.toLowerCase().includes(q) || p.numero_sc.toLowerCase().includes(q));
+    }
+    if (filtroDataDe)  r = r.filter(p => p.data >= filtroDataDe);
+    if (filtroDataAte) r = r.filter(p => p.data <= filtroDataAte);
+    return r;
+  }, [filtroBusca, filtroDataDe, filtroDataAte]);
+
+  const pedidosAba = useMemo(
+    () => aplicarFiltros(baseParaAba(abaAtiva)),
+    [baseParaAba, abaAtiva, aplicarFiltros]
+  );
+
+  // Badge de contagem por aba (já considerando os filtros ativos)
+  const contagem = useCallback(
+    (aba: string) => aplicarFiltros(baseParaAba(aba)).length,
+    [baseParaAba, aplicarFiltros]
+  );
+
+  // KPIs globais (já restritos ao setor de quem está vendo)
   const kpis = useMemo(() => ({
-    pendentes:  pedidos.filter(p => p.status === "PENDENTE").length,
-    cotando:    pedidos.filter(p => p.status === "COTANDO").length,
-    aprovacao:  pedidos.filter(p => p.status === "AGUARDANDO_APROVACAO_MANUTENCAO" || p.status === "AGUARDANDO_APROVACAO_COMPRA").length,
-    transito:   pedidos.filter(p => p.status === "EM_TRANSITO").length,
-  }), [pedidos]);
+    pendentes:  pedidosVisiveis.filter(p => p.status === "PENDENTE").length,
+    cotando:    pedidosVisiveis.filter(p => p.status === "COTANDO").length,
+    aprovacao:  pedidosVisiveis.filter(p => p.status === "AGUARDANDO_APROVACAO_MANUTENCAO" || p.status === "AGUARDANDO_APROVACAO_COMPRA").length,
+    transito:   pedidosVisiveis.filter(p => p.status === "EM_TRANSITO").length,
+  }), [pedidosVisiveis]);
 
   // Executa uma chamada de API de transição e atualiza a lista com o retorno do servidor
   const executarAcao = useCallback(async (chamada: () => Promise<unknown>) => {
@@ -203,6 +235,7 @@ export default function PedidosOrcamento({ user, setor }: Props) {
       setDrawer(d => d?.id === salvo.id ? salvo : d);
       setAcaoModal(null);
       setAcaoValor("");
+      setComparativoModal(null);
       toast.success("Status atualizado com sucesso!");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao atualizar pedido.");
@@ -213,13 +246,7 @@ export default function PedidosOrcamento({ user, setor }: Props) {
   const confirmarAcao = async () => {
     if (!acaoModal) return;
     const { pedido, tipo } = acaoModal;
-    if (tipo === "cotacao") {
-      const v = parseFloat(acaoValor.replace(",", "."));
-      if (isNaN(v) || v <= 0) { toast.error("Informe o valor da cotação."); return; }
-      await executarAcao(() => api.pedidosOrcamento.enviarAprovacaoManutencao(pedido.id, { valor_total: v }));
-    } else if (tipo === "aprovar_manutencao") {
-      await executarAcao(() => api.pedidosOrcamento.aprovarManutencao(pedido.id));
-    } else if (tipo === "aprovar_compra") {
+    if (tipo === "aprovar_compra") {
       await executarAcao(() => api.pedidosOrcamento.aprovarCompra(pedido.id));
     } else if (tipo === "rejeitar") {
       if (!acaoValor.trim()) { toast.error("Informe o motivo da rejeição."); return; }
@@ -278,15 +305,22 @@ export default function PedidosOrcamento({ user, setor }: Props) {
         {label}
       </button>
     );
+    const btnComparativo = (label: string, modo: "editar" | "aprovar", cor: string) => (
+      <button key={label} disabled={salvando}
+        onClick={() => setComparativoModal({ pedido: p, modo })}
+        className={`${cls} ${cor}`}>
+        {label}
+      </button>
+    );
 
     const acoes: React.ReactNode[] = [];
 
     if (temResp("cotador") && p.status === "PENDENTE")
       acoes.push(btnDireto("Iniciar Cotação", () => api.pedidosOrcamento.iniciarCotacao(p.id), "bg-blue-600 hover:bg-blue-700"));
     if (temResp("cotador") && p.status === "COTANDO")
-      acoes.push(btnModal("Enviar para Aprovação", "cotacao", "bg-amber-500 hover:bg-amber-600"));
+      acoes.push(btnComparativo("Preencher Cotação", "editar", "bg-amber-500 hover:bg-amber-600"));
     if (temResp("aprovador_manutencao") && p.status === "AGUARDANDO_APROVACAO_MANUTENCAO") {
-      acoes.push(btnModal("Aprovar Orçamento", "aprovar_manutencao", "bg-emerald-600 hover:bg-emerald-700"));
+      acoes.push(btnComparativo("Aprovar Orçamento", "aprovar", "bg-emerald-600 hover:bg-emerald-700"));
       acoes.push(btnModal("Rejeitar", "rejeitar", "bg-red-500 hover:bg-red-600"));
     }
     if (temResp("aprovador_suprimentos") && p.status === "AGUARDANDO_APROVACAO_COMPRA") {
@@ -331,6 +365,29 @@ export default function PedidosOrcamento({ user, setor }: Props) {
             <p className={`text-2xl font-black ${k.cor}`}>{k.valor}</p>
           </div>
         ))}
+      </div>
+
+      {/* Filtros de busca */}
+      <div className="flex flex-wrap items-end gap-3 bg-white border border-slate-100 rounded-xl p-4">
+        <div className="flex-1 min-w-[200px]">
+          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Buscar (frota, obra, equipamento ou nº da SC)</label>
+          <input value={filtroBusca} onChange={e => setFiltroBusca(e.target.value)}
+            placeholder="Ex: PC200, Obra BR-153, SC-ORC-2026-0001" className={inp} />
+        </div>
+        <div>
+          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">De</label>
+          <input type="date" value={filtroDataDe} onChange={e => setFiltroDataDe(e.target.value)} className={inp} />
+        </div>
+        <div>
+          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Até</label>
+          <input type="date" value={filtroDataAte} onChange={e => setFiltroDataAte(e.target.value)} className={inp} />
+        </div>
+        {(filtroBusca || filtroDataDe || filtroDataAte) && (
+          <button onClick={() => { setFiltroBusca(""); setFiltroDataDe(""); setFiltroDataAte(""); }}
+            className="text-[10px] font-bold text-slate-400 hover:text-red-500 transition-colors px-2 py-2">
+            Limpar filtros
+          </button>
+        )}
       </div>
 
       {/* Abas + Lista */}
@@ -487,8 +544,6 @@ export default function PedidosOrcamento({ user, setor }: Props) {
         isOpen={!!acaoModal}
         onClose={() => { setAcaoModal(null); setAcaoValor(""); }}
         title={
-          acaoModal?.tipo === "cotacao"             ? "Registrar Cotação"     :
-          acaoModal?.tipo === "aprovar_manutencao"  ? "Aprovar Orçamento"     :
           acaoModal?.tipo === "aprovar_compra"      ? "Aprovar Compra"        :
           acaoModal?.tipo === "rejeitar"            ? "Rejeitar Pedido"       :
           acaoModal?.tipo === "comprar"             ? "Registrar Compra"      :
@@ -500,17 +555,6 @@ export default function PedidosOrcamento({ user, setor }: Props) {
             <p className="text-xs text-slate-600">
               Pedido <strong className="font-mono">{acaoModal.pedido.numero_sc}</strong> — {acaoModal.pedido.destino}
             </p>
-
-            {acaoModal.tipo === "cotacao" && (
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">
-                  Valor Total Cotado (R$)
-                </label>
-                <input type="number" min="0" step="0.01"
-                  value={acaoValor} onChange={e => setAcaoValor(e.target.value)}
-                  placeholder="Ex: 1500.00" className={inp} autoFocus/>
-              </div>
-            )}
 
             {acaoModal.tipo === "rejeitar" && (
               <div>
@@ -525,13 +569,6 @@ export default function PedidosOrcamento({ user, setor }: Props) {
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Data Prevista de Recebimento</label>
                 <input type="date" min={todayISO()} value={acaoValor} onChange={e => setAcaoValor(e.target.value)} className={inp} autoFocus/>
               </div>
-            )}
-
-            {acaoModal.tipo === "aprovar_manutencao" && (
-              <p className="text-xs text-slate-500">
-                Confirma a aprovação do orçamento deste pedido?
-                {acaoModal.pedido.valor_total > 0 ? ` Valor: ${fmtMoeda(acaoModal.pedido.valor_total)}` : ""}
-              </p>
             )}
 
             {acaoModal.tipo === "aprovar_compra" && (
@@ -551,12 +588,10 @@ export default function PedidosOrcamento({ user, setor }: Props) {
               <button onClick={confirmarAcao} disabled={salvando}
                 className={`px-5 py-2 text-xs font-bold text-white rounded-lg transition-all hover:-translate-y-0.5 disabled:opacity-60 ${
                   acaoModal.tipo === "rejeitar" ? "bg-red-600 hover:bg-red-700" :
-                  acaoModal.tipo === "aprovar_manutencao" || acaoModal.tipo === "aprovar_compra" || acaoModal.tipo === "receber" ? "bg-emerald-600 hover:bg-emerald-700" :
+                  acaoModal.tipo === "aprovar_compra" || acaoModal.tipo === "receber" ? "bg-emerald-600 hover:bg-emerald-700" :
                   "bg-gradient-to-r from-[#C75B12] to-[#EA6C0A]"
                 }`}>
                 {salvando ? "Processando..." :
-                  acaoModal.tipo === "cotacao"             ? "Enviar para Aprovação" :
-                  acaoModal.tipo === "aprovar_manutencao"  ? "Aprovar"               :
                   acaoModal.tipo === "aprovar_compra"      ? "Aprovar"               :
                   acaoModal.tipo === "rejeitar"             ? "Rejeitar"              :
                   acaoModal.tipo === "comprar"              ? "Confirmar Compra"      :
@@ -564,6 +599,38 @@ export default function PedidosOrcamento({ user, setor }: Props) {
               </button>
             </div>
           </div>
+        )}
+      </Modal>
+
+      {/* Modal: Cotação Comparativa (preencher ou aprovar com escolha de fornecedor) */}
+      <Modal
+        isOpen={!!comparativoModal}
+        onClose={() => setComparativoModal(null)}
+        title={
+          comparativoModal?.modo === "editar"      ? "Cotação Comparativa de Compra" :
+          comparativoModal?.modo === "aprovar"     ? "Aprovar Orçamento — Escolher Fornecedor" :
+          "Cotação Comparativa"
+        }
+        size="xl">
+        {comparativoModal && (
+          <ComparativoCotacao
+            numeroSc={comparativoModal.pedido.numero_sc}
+            setor={comparativoModal.pedido.setor}
+            destino={comparativoModal.pedido.destino}
+            data={fmtDate(comparativoModal.pedido.data)}
+            itensIniciais={comparativoModal.pedido.itens}
+            fornecedores={comparativoModal.pedido.cotacao_fornecedores}
+            itensComparativo={comparativoModal.pedido.cotacao_itens}
+            fornecedorEscolhido={comparativoModal.pedido.fornecedor_escolhido}
+            modo={comparativoModal.modo}
+            salvando={salvando}
+            onSalvar={(dados) => executarAcao(() =>
+              api.pedidosOrcamento.enviarAprovacaoManutencao(comparativoModal.pedido.id, dados)
+            )}
+            onAprovar={(fornecedorEscolhido) => executarAcao(() =>
+              api.pedidosOrcamento.aprovarManutencao(comparativoModal.pedido.id, { fornecedor_escolhido: fornecedorEscolhido })
+            )}
+          />
         )}
       </Modal>
 
@@ -604,6 +671,9 @@ export default function PedidosOrcamento({ user, setor }: Props) {
                 ["Destino",     drawer.destino],
                 ["Tipo",        drawer.tipo_destino === "FROTA" ? "Frota" : drawer.tipo_destino === "OBRA" ? "Obra" : "Equipamento"],
                 ["Data",        fmtDate(drawer.data)],
+                ...(drawer.fornecedor_escolhido ? [["Fornecedor Escolhido", drawer.fornecedor_escolhido]] : []),
+                ...(drawer.prazo_entrega_escolhido ? [["Prazo de Entrega", drawer.prazo_entrega_escolhido]] : []),
+                ...(drawer.forma_pagamento_escolhida ? [["Forma de Pagamento", drawer.forma_pagamento_escolhida]] : []),
                 ...(drawer.valor_total > 0 ? [["Valor Total", fmtMoeda(drawer.valor_total)]] : []),
                 ...(drawer.data_prevista_recebimento ? [["Previsão de Recebimento", fmtDate(drawer.data_prevista_recebimento)]] : []),
                 ...(drawer.motivo_rejeicao ? [["Motivo da Rejeição", drawer.motivo_rejeicao]] : []),
@@ -625,6 +695,13 @@ export default function PedidosOrcamento({ user, setor }: Props) {
                   ))}
                 </div>
               </div>
+
+              {drawer.cotacao_fornecedores && (
+                <button onClick={() => setComparativoModal({ pedido: drawer, modo: "visualizar" })}
+                  className="w-full text-center text-[11px] font-bold text-blue-600 hover:text-[#EA6C0A] transition-colors py-1">
+                  Ver Cotação Comparativa →
+                </button>
+              )}
 
               <div className="pt-1">{renderBotoes(drawer, "md")}</div>
             </div>
