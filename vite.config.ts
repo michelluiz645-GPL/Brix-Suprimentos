@@ -26,6 +26,14 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    // Bind mount Windows (via WSL2) → container: eventos de inotify não
+    // chegam de forma confiável, então o Vite precisa checar por polling
+    // para detectar edições de arquivo (sem isso, ele serve versões
+    // desatualizadas do bundle até o container ser reiniciado).
+    watch: {
+      usePolling: true,
+      interval: 300,
+    },
     proxy: {
       "/api": {
         target: "http://localhost:3000",
