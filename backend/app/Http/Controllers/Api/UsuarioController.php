@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Modulo;
 use App\Models\Setor;
 use App\Models\User;
 use App\Services\PermissaoService;
@@ -41,6 +42,9 @@ class UsuarioController extends Controller
             'papel'     => ['required', Rule::in(User::PAPEIS)],
             'setor'     => ['required', Rule::in([Setor::ALMOXARIFADO, Setor::ENGENHARIA, Setor::MANUTENCAO])],
             'modulos'   => ['sometimes', 'array'],
+            'responsabilidades'                     => ['sometimes', 'array'],
+            'responsabilidades.pedido_orcamento'     => ['sometimes', 'array'],
+            'responsabilidades.pedido_orcamento.*'   => [Rule::in(Modulo::RESPONSABILIDADES_PEDIDO_ORCAMENTO)],
         ], [
             'login.unique'  => 'Este usuário já está cadastrado.',
             'email.unique'  => 'Este e-mail já está em uso.',
@@ -63,8 +67,7 @@ class UsuarioController extends Controller
         ]);
 
         if (isset($data['modulos'])) {
-            $ids = \App\Models\Modulo::whereIn('chave', $data['modulos'])->pluck('id');
-            $usuario->modulos()->sync($ids);
+            $this->sincronizarModulos($usuario, $data['modulos'], $data['responsabilidades'] ?? []);
         } else {
             app(PermissaoService::class)->aplicarTemplatePadrao($usuario);
         }
@@ -85,6 +88,9 @@ class UsuarioController extends Controller
             'papel'    => ['sometimes', Rule::in(User::PAPEIS)],
             'ativo'    => ['sometimes', 'boolean'],
             'modulos'  => ['sometimes', 'array'],
+            'responsabilidades'                     => ['sometimes', 'array'],
+            'responsabilidades.pedido_orcamento'     => ['sometimes', 'array'],
+            'responsabilidades.pedido_orcamento.*'   => [Rule::in(Modulo::RESPONSABILIDADES_PEDIDO_ORCAMENTO)],
         ]);
 
         $campos = array_filter(
@@ -94,8 +100,9 @@ class UsuarioController extends Controller
         $usuario->update($campos);
 
         if (isset($data['modulos'])) {
-            $ids = \App\Models\Modulo::whereIn('chave', $data['modulos'])->pluck('id');
-            $usuario->modulos()->sync($ids);
+            $this->sincronizarModulos($usuario, $data['modulos'], $data['responsabilidades'] ?? []);
+        } elseif (isset($data['responsabilidades'])) {
+            $this->sincronizarModulos($usuario, $usuario->modulos->pluck('chave')->all(), $data['responsabilidades']);
         }
 
         return response()->json([
@@ -117,6 +124,28 @@ class UsuarioController extends Controller
         return response()->json(['data' => null, 'message' => 'Senha redefinida com sucesso.']);
     }
 
+    /**
+     * Sincroniza os módulos liberados e, quando informado, grava as
+     * responsabilidades granulares de cada módulo no pivô (RN-002.3).
+     * Ignora silenciosamente qualquer chave que não pertença ao setor do
+     * usuário (RN-002.1) — a tela já filtra isso, mas a API não deve
+     * confiar apenas no client.
+     */
+    private function sincronizarModulos(User $usuario, array $chavesModulos, array $responsabilidadesPorModulo): void
+    {
+        $codigoSetor = $usuario->setor->codigo;
+
+        $modulos = Modulo::whereIn('chave', $chavesModulos)
+            ->get()
+            ->filter(fn (Modulo $m) => $m->disponivelParaSetor($codigoSetor));
+
+        $sync = $modulos->mapWithKeys(fn (Modulo $m) => [
+            $m->id => ['responsabilidades' => $responsabilidadesPorModulo[$m->chave] ?? null],
+        ])->all();
+
+        $usuario->modulos()->sync($sync);
+    }
+
     private function serialize(User $u): array
     {
         return [
@@ -131,6 +160,7 @@ class UsuarioController extends Controller
             'setor'    => $u->setor?->codigo,
             'ativo'    => $u->ativo,
             'modulos'  => $u->modulos->pluck('chave'),
+            'responsabilidades' => $u->responsabilidadesPorModulo(),
         ];
     }
 }

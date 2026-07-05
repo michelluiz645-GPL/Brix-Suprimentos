@@ -1,0 +1,34 @@
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+class CriarPedidoOrcamentoRequest extends FormRequest
+{
+    public function authorize(): bool { return true; }
+
+    public function rules(): array
+    {
+        return [
+            'numero_sc'    => ['nullable', 'string', 'unique:pedidos_orcamento,numero_sc'],
+            'data'         => ['required', 'date'],
+            'destino'      => ['required', 'string', 'max:150'],
+            'tipo_destino' => ['required', 'in:FROTA,OBRA,EQUIPAMENTO'],
+            'urgencia'     => ['required', 'in:CRITICA,ALTA,MEDIA,BAIXA'],
+            'itens'                 => ['required', 'array', 'min:1'],
+            'itens.*.descricao'     => ['required', 'string'],
+            'itens.*.quantidade'    => ['required', 'numeric', 'min:0.01'],
+            'itens.*.unidade'       => ['required', 'string'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'numero_sc.unique'  => 'Este número de SC já existe.',
+            'itens.required'    => 'Adicione ao menos um item.',
+            'destino.required'  => 'O destino é obrigatório.',
+        ];
+    }
+}

@@ -41,7 +41,7 @@ export const api = {
         body: JSON.stringify({ login, senha, setor }),
       }),
     logout: () => request("/logout", { method: "POST" }),
-    me: () => request<{ user: object }>("/me"),
+    me: () => request<object>("/me"),
   },
 
   produtos: {
@@ -78,9 +78,15 @@ export const api = {
   },
 
   pedidosOrcamento: {
-    list:         ()                    => request<object[]>("/pedidos-orcamento"),
-    create:       (data: object)        => request<object>("/pedidos-orcamento", { method: "POST", body: JSON.stringify(data) }),
-    updateStatus: (id: number, data: object) => request<object>(`/pedidos-orcamento/${id}/status`, { method: "PATCH", body: JSON.stringify(data) }),
+    list:   ()             => request<object[]>("/pedidos-orcamento"),
+    create: (data: object) => request<object>("/pedidos-orcamento", { method: "POST", body: JSON.stringify(data) }),
+    iniciarCotacao:            (id: number)               => request<object>(`/pedidos-orcamento/${id}/iniciar-cotacao`, { method: "POST" }),
+    enviarAprovacaoManutencao: (id: number, data: object) => request<object>(`/pedidos-orcamento/${id}/enviar-aprovacao-manutencao`, { method: "POST", body: JSON.stringify(data) }),
+    aprovarManutencao:         (id: number)               => request<object>(`/pedidos-orcamento/${id}/aprovar-manutencao`, { method: "POST" }),
+    rejeitar:                  (id: number, data: object) => request<object>(`/pedidos-orcamento/${id}/rejeitar`, { method: "POST", body: JSON.stringify(data) }),
+    aprovarCompra:             (id: number)               => request<object>(`/pedidos-orcamento/${id}/aprovar-compra`, { method: "POST" }),
+    registrarCompra:           (id: number, data: object) => request<object>(`/pedidos-orcamento/${id}/registrar-compra`, { method: "POST", body: JSON.stringify(data) }),
+    confirmarRecebimento:      (id: number)               => request<object>(`/pedidos-orcamento/${id}/confirmar-recebimento`, { method: "POST" }),
   },
 
   funcionarios: {
@@ -140,6 +146,10 @@ export const api = {
     list: (params?: string)  => request<object>(`/debitos${params ? `?${params}` : ""}`),
     create: (data: object)   => request<object>("/debitos", { method: "POST", body: JSON.stringify(data) }),
     pagar: (id: number)      => request<object>(`/debitos/${id}/pagar`, { method: "PATCH" }),
+  },
+
+  modulos: {
+    list: (setor?: string) => request<{ chave: string; nome: string }[]>(`/modulos${setor ? `?setor=${setor}` : ""}`),
   },
 
   usuarios: {

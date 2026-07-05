@@ -4,8 +4,8 @@ import Modal from "@/components/Modal";
 import PageHeader from "@/components/PageHeader";
 import { useToast } from "@/hooks/useToast";
 import ToastContainer from "@/components/Toast";
-import type { User } from "@/types";
-import { PAPEL_LABELS } from "@/types";
+import type { User, ResponsabilidadePedidoOrcamento } from "@/types";
+import { PAPEL_LABELS, RESPONSABILIDADE_PEDIDO_ORCAMENTO_LABELS } from "@/types";
 import { Plus, Edit, Lock } from "lucide-react";
 import CadastroUsuario from "@/pages/Usuarios/CadastroUsuario";
 
@@ -48,6 +48,10 @@ const NIVEL_COLOR: Record<string, string> = {
   OPERADOR: "bg-blue-100 text-blue-800",
 };
 
+const RESPONSABILIDADES_PEDIDO_ORCAMENTO: ResponsabilidadePedidoOrcamento[] = [
+  "solicitante", "cotador", "aprovador_manutencao", "aprovador_suprimentos", "comprador",
+];
+
 export default function Usuarios() {
   const toast = useToast();
   const [users, setUsers]   = useState<User[]>([]);
@@ -57,6 +61,7 @@ export default function Usuarios() {
   const [form, setForm]     = useState<Partial<User & { senha: string }>>({ setor: "ALMOXARIFADO", nivel: "OPERADOR", modulos: [] });
   const [novaSenha, setNovaSenha] = useState("");
   const [saving, setSaving] = useState(false);
+  const [modulosDoSetor, setModulosDoSetor] = useState<string[]>([]);
 
   const load = () => {
     setLoading(true);
@@ -66,6 +71,19 @@ export default function Usuarios() {
   };
   useEffect(() => { load(); }, []);
 
+  // Cada setor só pode acessar um subconjunto dos módulos do sistema
+  // (RN-002.1) — recarrega essa lista sempre que o setor do formulário muda,
+  // e remove do formulário qualquer módulo já marcado que não pertença mais
+  // ao novo setor (evita liberar um módulo sem efeito nenhum para o usuário).
+  useEffect(() => {
+    if (modal !== "create" && modal !== "edit") return;
+    api.modulos.list(form.setor as string).then((r) => {
+      const chaves = Array.isArray(r) ? r.map((m) => m.chave) : [];
+      setModulosDoSetor(chaves);
+      setForm((p) => ({ ...p, modulos: (p.modulos ?? []).filter((m) => chaves.includes(m)) }));
+    }).catch(() => setModulosDoSetor([]));
+  }, [modal, form.setor]);
+
   const openCreate = () => { setForm({ setor: "ALMOXARIFADO", nivel: "OPERADOR", modulos: [] }); setModal("create"); };
   const openEdit   = (u: User) => { setTarget(u); setForm({ ...u }); setModal("edit"); };
   const openSenha  = (u: User) => { setTarget(u); setNovaSenha(""); setModal("senha"); };
@@ -73,6 +91,12 @@ export default function Usuarios() {
   const toggleModulo = (chave: string) => setForm((p) => {
     const prev = p.modulos ?? [];
     return { ...p, modulos: prev.includes(chave) ? prev.filter((x) => x !== chave) : [...prev, chave] };
+  });
+
+  const toggleResponsabilidade = (modulo: string, resp: string) => setForm((p) => {
+    const atuais = p.responsabilidades?.[modulo] ?? [];
+    const novas = atuais.includes(resp) ? atuais.filter((r) => r !== resp) : [...atuais, resp];
+    return { ...p, responsabilidades: { ...p.responsabilidades, [modulo]: novas } };
   });
 
   const handleSave = async () => {
@@ -214,9 +238,11 @@ export default function Usuarios() {
 
           {form.nivel !== "ADMIN" && (
             <div>
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-2">Módulos Permitidos</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-2">
+                Módulos Permitidos <span className="font-normal normal-case text-slate-400">(apenas os disponíveis para o setor selecionado)</span>
+              </label>
               <div className="grid grid-cols-3 gap-1.5">
-                {MODULOS_ALL.map(({ chave, label }) => {
+                {MODULOS_ALL.filter(({ chave }) => modulosDoSetor.includes(chave)).map(({ chave, label }) => {
                   const checked = (form.modulos ?? []).includes(chave);
                   return (
                     <label key={chave} className={`flex items-center gap-2 cursor-pointer px-2 py-1.5 rounded-lg border text-xs transition-colors ${checked ? "bg-[#EA6C0A]/10 border-[#EA6C0A]/30 text-[#C75B12] font-semibold" : "bg-slate-50 border-slate-200 text-slate-500"}`}>
@@ -229,6 +255,29 @@ export default function Usuarios() {
                   );
                 })}
               </div>
+
+              {(form.modulos ?? []).includes("pedido_orcamento") && (
+                <div className="mt-3 p-3 bg-orange-50/50 border border-orange-100 rounded-lg">
+                  <label className="text-[10px] font-bold text-[#C75B12] uppercase tracking-widest block mb-2">
+                    Responsabilidades em Pedido de Orçamento
+                  </label>
+                  <p className="text-[10px] text-slate-500 mb-2">Um usuário pode acumular mais de uma responsabilidade.</p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {RESPONSABILIDADES_PEDIDO_ORCAMENTO.map((resp) => {
+                      const checked = (form.responsabilidades?.pedido_orcamento ?? []).includes(resp);
+                      return (
+                        <label key={resp} className={`flex items-center gap-2 cursor-pointer px-2 py-1.5 rounded-lg border text-xs transition-colors ${checked ? "bg-[#EA6C0A]/10 border-[#EA6C0A]/30 text-[#C75B12] font-semibold" : "bg-white border-slate-200 text-slate-500"}`}>
+                          <input type="checkbox" checked={checked} onChange={() => toggleResponsabilidade("pedido_orcamento", resp)} className="hidden" />
+                          <span className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 ${checked ? "bg-[#EA6C0A] border-[#EA6C0A]" : "border-slate-300"}`}>
+                            {checked && <span className="text-white text-[8px] font-bold">✓</span>}
+                          </span>
+                          {RESPONSABILIDADE_PEDIDO_ORCAMENTO_LABELS[resp]}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

@@ -16,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'modulo' => \App\Http\Middleware\VerificaModulo::class,
             'papel'  => \App\Http\Middleware\VerificaPapel::class,
+            'responsabilidade' => \App\Http\Middleware\VerificaResponsabilidade::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

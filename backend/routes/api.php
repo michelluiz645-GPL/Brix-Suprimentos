@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ModuloController;
 use App\Http\Controllers\Api\PedidoOrcamentoController;
 use App\Http\Controllers\Api\SolicitacaoCompraController;
 use App\Http\Controllers\Api\UsuarioController;
@@ -12,6 +13,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me',      [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
+    // RN-002.1 — módulos disponíveis por setor (usado na tela de permissões)
+    Route::get('/modulos', [ModuloController::class, 'index']);
+
     // RF-027 — Administração de Usuários
     Route::get('/usuarios',                   [UsuarioController::class, 'index']);
     Route::get('/usuarios/{usuario}',         [UsuarioController::class, 'show']);
@@ -19,10 +23,39 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/usuarios/{usuario}',         [UsuarioController::class, 'update']);
     Route::patch('/usuarios/{usuario}/senha', [UsuarioController::class, 'resetSenha']);
 
-    // Pedidos de Orçamento (Manutenção → Suprimentos)
-    Route::get('/pedidos-orcamento',                              [PedidoOrcamentoController::class, 'index']);
-    Route::post('/pedidos-orcamento',                             [PedidoOrcamentoController::class, 'store']);
-    Route::patch('/pedidos-orcamento/{pedidoOrcamento}/status',   [PedidoOrcamentoController::class, 'updateStatus']);
+    // Pedidos de Orçamento (Manutenção ⇄ Suprimentos, dupla aprovação)
+    Route::get('/pedidos-orcamento',  [PedidoOrcamentoController::class, 'index']);
+
+    Route::post('/pedidos-orcamento', [PedidoOrcamentoController::class, 'store'])
+        ->middleware('responsabilidade:pedido_orcamento,solicitante');
+
+    Route::post('/pedidos-orcamento/{pedidoOrcamento}/iniciar-cotacao',
+        [PedidoOrcamentoController::class, 'iniciarCotacao']
+    )->middleware('responsabilidade:pedido_orcamento,cotador');
+
+    Route::post('/pedidos-orcamento/{pedidoOrcamento}/enviar-aprovacao-manutencao',
+        [PedidoOrcamentoController::class, 'enviarAprovacaoManutencao']
+    )->middleware('responsabilidade:pedido_orcamento,cotador');
+
+    Route::post('/pedidos-orcamento/{pedidoOrcamento}/aprovar-manutencao',
+        [PedidoOrcamentoController::class, 'aprovarManutencao']
+    )->middleware('responsabilidade:pedido_orcamento,aprovador_manutencao');
+
+    Route::post('/pedidos-orcamento/{pedidoOrcamento}/rejeitar',
+        [PedidoOrcamentoController::class, 'rejeitar']
+    )->middleware('responsabilidade:pedido_orcamento,aprovador_manutencao,aprovador_suprimentos');
+
+    Route::post('/pedidos-orcamento/{pedidoOrcamento}/aprovar-compra',
+        [PedidoOrcamentoController::class, 'aprovarCompra']
+    )->middleware('responsabilidade:pedido_orcamento,aprovador_suprimentos');
+
+    Route::post('/pedidos-orcamento/{pedidoOrcamento}/registrar-compra',
+        [PedidoOrcamentoController::class, 'registrarCompra']
+    )->middleware('responsabilidade:pedido_orcamento,comprador');
+
+    Route::post('/pedidos-orcamento/{pedidoOrcamento}/confirmar-recebimento',
+        [PedidoOrcamentoController::class, 'confirmarRecebimento']
+    )->middleware('papel:op_manutencao,admin_manutencao,almoxarife');
 
     // RF-021 — Solicitação de Compra (SC)
     Route::get('/sc',  [SolicitacaoCompraController::class, 'index']);

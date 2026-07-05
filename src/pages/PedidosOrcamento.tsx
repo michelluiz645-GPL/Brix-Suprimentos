@@ -4,16 +4,19 @@ import Modal from "@/components/Modal";
 import { api } from "@/services/api";
 import { useToast } from "@/hooks/useToast";
 import ToastContainer from "@/components/Toast";
+import type { ResponsabilidadePedidoOrcamento } from "@/types";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 type Urgencia    = "CRITICA" | "ALTA" | "MEDIA" | "BAIXA";
-type Status      = "PENDENTE" | "COTANDO" | "AGUARDANDO_APROVACAO" | "APROVADO" | "EM_TRANSITO" | "CONCLUIDO" | "REJEITADO";
+type Status      =
+  | "PENDENTE" | "COTANDO" | "AGUARDANDO_APROVACAO_MANUTENCAO" | "AGUARDANDO_APROVACAO_COMPRA"
+  | "APROVADO" | "EM_TRANSITO" | "CONCLUIDO" | "REJEITADO";
 type TipoDestino = "FROTA" | "OBRA" | "EQUIPAMENTO";
-type TipoAcao    = "cotacao" | "aprovar" | "rejeitar" | "comprar" | "receber" | null;
+type TipoAcao    = "cotacao" | "aprovar_manutencao" | "aprovar_compra" | "rejeitar" | "comprar" | "receber" | null;
 
 interface Item { descricao: string; quantidade: number; unidade: string; }
 interface TimelineStep {
-  titulo: string; subtitulo: string; data?: string;
+  titulo: string; subtitulo: string; data?: string | null;
   estado: "concluido" | "atual" | "rejeitado" | "futuro";
 }
 interface Pedido {
@@ -22,9 +25,16 @@ interface Pedido {
   urgencia: Urgencia; status: Status;
   itens: Item[]; valor_total: number; solicitante: string;
   timeline: TimelineStep[];
+  cotado_por?: string | null;
+  aprovado_manutencao_por?: string | null;
+  aprovado_compra_por?: string | null;
+  comprado_por?: string | null;
+  data_prevista_recebimento?: string | null;
+  recebido_por?: string | null;
+  motivo_rejeicao?: string | null;
 }
 interface Props {
-  user: { login: string; nome: string; nivel: string; papel?: string };
+  user: { login: string; nome: string; nivel: string; papel?: string; responsabilidades?: Record<string, string[]> };
   setor: string;
 }
 
@@ -34,13 +44,19 @@ const FROTAS   = ["PC200 - Escavadeira","WA320 - Pá Carregadeira","D6T - Motoni
 const EQUIPAMENTOS_LIST = ["Gerador 180kVA","Compressor de Ar 250L","Bomba de Concreto","Rolo Compactador","Vibrador de Concreto","Serra Circular","Andaime Tubular"];
 const ITEM_VAZIO: Item = { descricao: "", quantidade: 1, unidade: "Un" };
 
+const RESPONSABILIDADES_TODAS: ResponsabilidadePedidoOrcamento[] = [
+  "solicitante", "cotador", "aprovador_manutencao", "aprovador_suprimentos", "comprador",
+];
+
 const STATUS_LABEL: Record<Status, string> = {
-  PENDENTE:"Pendente", COTANDO:"Cotando", AGUARDANDO_APROVACAO:"Ag. Aprovação",
-  APROVADO:"Aprovado", EM_TRANSITO:"Em Trânsito", CONCLUIDO:"Concluído", REJEITADO:"Rejeitado",
+  PENDENTE:"Pendente", COTANDO:"Cotando",
+  AGUARDANDO_APROVACAO_MANUTENCAO:"Ag. Aprov. Manutenção", AGUARDANDO_APROVACAO_COMPRA:"Ag. Aprov. Compra",
+  APROVADO:"Compra Aprovada", EM_TRANSITO:"Em Trânsito", CONCLUIDO:"Concluído", REJEITADO:"Rejeitado",
 };
 const STATUS_COLOR: Record<Status, string> = {
   PENDENTE:"bg-slate-100 text-slate-600", COTANDO:"bg-blue-100 text-blue-700",
-  AGUARDANDO_APROVACAO:"bg-amber-100 text-amber-700", APROVADO:"bg-emerald-100 text-emerald-700",
+  AGUARDANDO_APROVACAO_MANUTENCAO:"bg-amber-100 text-amber-700", AGUARDANDO_APROVACAO_COMPRA:"bg-amber-100 text-amber-700",
+  APROVADO:"bg-emerald-100 text-emerald-700",
   EM_TRANSITO:"bg-indigo-100 text-indigo-700", CONCLUIDO:"bg-green-100 text-green-800",
   REJEITADO:"bg-red-100 text-red-700",
 };
@@ -49,72 +65,26 @@ const URG_COLOR: Record<Urgencia, string> = {
   MEDIA:"bg-amber-100 text-amber-700", BAIXA:"bg-green-100 text-green-800",
 };
 const PROGRESSO: Record<Status, number> = {
-  PENDENTE:10, COTANDO:28, AGUARDANDO_APROVACAO:48,
+  PENDENTE:8, COTANDO:22, AGUARDANDO_APROVACAO_MANUTENCAO:38, AGUARDANDO_APROVACAO_COMPRA:52,
   APROVADO:65, EM_TRANSITO:82, CONCLUIDO:100, REJEITADO:40,
 };
 
-// Abas disponíveis por papel
-const ABAS_POR_PAPEL: Record<string, string[]> = {
-  op_manutencao:    ["Solicitações"],
-  admin_manutencao: ["Solicitações", "Para Aprovar"],
-  op_suprimentos:   ["Recebidas", "Em Cotação", "Aprovadas", "Em Trânsito"],
-  admin_suprimentos:["Recebidas", "Em Cotação", "Para Aprovar", "Aprovadas", "Em Trânsito"],
-  almoxarife:       ["Em Trânsito"],
-  admin_geral:      ["Solicitações", "Recebidas", "Em Cotação", "Para Aprovar", "Aprovadas", "Em Trânsito"],
-};
-
 const STATUS_DA_ABA: Record<string, Status[]> = {
-  "Solicitações":  [],
-  "Recebidas":     ["PENDENTE"],
-  "Em Cotação":    ["COTANDO"],
-  "Para Aprovar":  ["AGUARDANDO_APROVACAO"],
-  "Aprovadas":     ["APROVADO"],
-  "Em Trânsito":   ["EM_TRANSITO", "CONCLUIDO"],
+  "Solicitações":       [],
+  "Recebidas":          ["PENDENTE"],
+  "Em Cotação":         ["COTANDO"],
+  "Aprovar Orçamento":  ["AGUARDANDO_APROVACAO_MANUTENCAO"],
+  "Aprovar Compra":     ["AGUARDANDO_APROVACAO_COMPRA"],
+  "Aprovadas":          ["APROVADO"],
+  "Em Trânsito":        ["EM_TRANSITO", "CONCLUIDO"],
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtDate  = (iso: string) => { const [y,m,d] = iso.split("-"); return `${d}/${m}/${y}`; };
 const fmtMoeda = (v: number)   => v.toLocaleString("pt-BR", { style:"currency", currency:"BRL" });
 const todayISO = ()             => new Date().toISOString().slice(0, 10);
-const nowStr   = ()             => {
-  const d = new Date(); const p = (n: number) => String(n).padStart(2,"0");
-  return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
-};
 const barColor = (s: Status) =>
   s === "CONCLUIDO" ? "bg-emerald-500" : s === "REJEITADO" ? "bg-red-500" : "bg-[#EA6C0A]";
-
-const STATUS_STEP: Record<Status, number> = {
-  PENDENTE:0, COTANDO:1, AGUARDANDO_APROVACAO:2, APROVADO:3, EM_TRANSITO:4, CONCLUIDO:5, REJEITADO:-1,
-};
-const STEP_TITULOS = [
-  "Solicitação criada", "Cotação em andamento", "Aguardando aprovação",
-  "Aprovado", "Em trânsito", "Entrega concluída",
-];
-
-const criarTimeline = (solicitante: string): TimelineStep[] =>
-  STEP_TITULOS.map((titulo, i) => ({
-    titulo, subtitulo: i === 0 ? `${solicitante} — Manutenção` : "",
-    data: i === 0 ? nowStr() : undefined,
-    estado: (i === 0 ? "atual" : "futuro") as TimelineStep["estado"],
-  }));
-
-const transicao = (pedido: Pedido, novoStatus: Status, feito_por: string, extra?: { valor_total?: number }): Pedido => {
-  const stepAtual = STATUS_STEP[pedido.status];
-  const stepNovo  = STATUS_STEP[novoStatus];
-  const ts = nowStr();
-  const tl = pedido.timeline.map((step, i) => {
-    if (i < stepAtual) return step;
-    if (i === stepAtual) {
-      if (novoStatus === "REJEITADO")
-        return { ...step, estado: "rejeitado" as const, data: ts, subtitulo: `Rejeitado por: ${feito_por}` };
-      return { ...step, estado: "concluido" as const, data: step.data ?? ts };
-    }
-    if (novoStatus !== "REJEITADO" && i === stepNovo)
-      return { ...step, estado: "atual" as const, data: ts, subtitulo: step.subtitulo || feito_por };
-    return step;
-  });
-  return { ...pedido, status: novoStatus, timeline: tl, ...(extra ?? {}) };
-};
 
 const LS_KEY = "geplan_pedidos_orcamento";
 const lsCarregar = (): Pedido[] => {
@@ -124,26 +94,31 @@ const lsSalvar = (lista: Pedido[]) => {
   try { localStorage.setItem(LS_KEY, JSON.stringify(lista)); } catch { /* sem espaço */ }
 };
 
-const gerarNumeroSC = (lista: Pedido[]) => {
-  const ano = new Date().getFullYear();
-  const usados = lista.map(p => p.numero_sc).filter(n => n.startsWith(`SC-${ano}-`));
-  let seq = usados.length + 1;
-  let candidato = `SC-${ano}-${String(seq).padStart(3,"0")}`;
-  while (usados.includes(candidato)) { seq++; candidato = `SC-${ano}-${String(seq).padStart(3,"0")}`; }
-  return candidato;
-};
-
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function PedidosOrcamento({ user, setor }: Props) {
   const papel = user.papel ?? (
     setor === "MANUTENCAO"  ? "op_manutencao" :
     setor === "ALMOXARIFADO"? "almoxarife"     : "op_suprimentos"
   );
-  const isManut = papel === "op_manutencao" || papel === "admin_manutencao";
-  const isSup   = papel === "op_suprimentos"  || papel === "admin_suprimentos";
-  const isAdmin = papel === "admin_manutencao" || papel === "admin_suprimentos" || papel === "admin_geral";
+  const nivelAdmin = (user as { nivel?: string }).nivel === "ADMIN";
+  const minhasResp = useMemo(() => new Set(
+    nivelAdmin ? RESPONSABILIDADES_TODAS : (user.responsabilidades?.pedido_orcamento ?? [])
+  ), [nivelAdmin, user.responsabilidades]);
+  const temResp = useCallback((r: ResponsabilidadePedidoOrcamento) => minhasResp.has(r), [minhasResp]);
 
-  const abas = ABAS_POR_PAPEL[papel] ?? ["Solicitações"];
+  // "Confirmar Recebimento" continua gated por papel/setor, como já era.
+  const podeConfirmarRecebimento = papel === "op_manutencao" || papel === "admin_manutencao" || papel === "almoxarife" || papel === "admin_geral";
+
+  const abas = useMemo(() => {
+    const lista: string[] = [];
+    if (temResp("solicitante"))           lista.push("Solicitações");
+    if (temResp("cotador"))                lista.push("Recebidas", "Em Cotação");
+    if (temResp("aprovador_manutencao"))    lista.push("Aprovar Orçamento");
+    if (temResp("aprovador_suprimentos"))   lista.push("Aprovar Compra");
+    if (temResp("comprador"))               lista.push("Aprovadas");
+    if (podeConfirmarRecebimento)            lista.push("Em Trânsito");
+    return lista.length ? lista : ["Solicitações"];
+  }, [temResp, podeConfirmarRecebimento]);
 
   const toast = useToast();
   const [pedidos,  setPedidos]  = useState<Pedido[]>(lsCarregar);
@@ -178,43 +153,48 @@ export default function PedidosOrcamento({ user, setor }: Props) {
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  // Pedidos filtrados pela aba ativa
+  // Pedidos filtrados pela aba ativa. Em "Solicitações", quem só tem a
+  // responsabilidade de solicitante acompanha suas próprias solicitações em
+  // qualquer status (do PENDENTE ao CONCLUIDO/REJEITADO); quem também tem
+  // outra responsabilidade (cotador, aprovador etc.) já vê a fila inteira
+  // por padrão nas outras abas, então aqui vê todos os pedidos.
   const pedidosAba = useMemo(() => {
     const statusFiltro = STATUS_DA_ABA[abaAtiva] ?? [];
     if (abaAtiva === "Solicitações") {
-      if (papel === "op_manutencao")
+      const apenasSolicitante = temResp("solicitante") && !nivelAdmin &&
+        !temResp("cotador") && !temResp("aprovador_manutencao") && !temResp("aprovador_suprimentos") && !temResp("comprador");
+      if (apenasSolicitante)
         return pedidos.filter(p => p.solicitante === user.nome);
       return pedidos;
     }
     return pedidos.filter(p => statusFiltro.includes(p.status));
-  }, [pedidos, abaAtiva, papel, user.nome]);
+  }, [pedidos, abaAtiva, temResp, nivelAdmin, user.nome]);
 
   // Badge de contagem por aba
   const contagem = useCallback((aba: string) => {
     const statusFiltro = STATUS_DA_ABA[aba] ?? [];
     if (aba === "Solicitações") {
-      if (papel === "op_manutencao") return pedidos.filter(p => p.solicitante === user.nome).length;
+      const apenasSolicitante = temResp("solicitante") && !nivelAdmin &&
+        !temResp("cotador") && !temResp("aprovador_manutencao") && !temResp("aprovador_suprimentos") && !temResp("comprador");
+      if (apenasSolicitante) return pedidos.filter(p => p.solicitante === user.nome).length;
       return pedidos.length;
     }
     return pedidos.filter(p => statusFiltro.includes(p.status)).length;
-  }, [pedidos, papel, user.nome]);
+  }, [pedidos, temResp, nivelAdmin, user.nome]);
 
   // KPIs globais
   const kpis = useMemo(() => ({
     pendentes:  pedidos.filter(p => p.status === "PENDENTE").length,
     cotando:    pedidos.filter(p => p.status === "COTANDO").length,
-    aprovacao:  pedidos.filter(p => p.status === "AGUARDANDO_APROVACAO").length,
+    aprovacao:  pedidos.filter(p => p.status === "AGUARDANDO_APROVACAO_MANUTENCAO" || p.status === "AGUARDANDO_APROVACAO_COMPRA").length,
     transito:   pedidos.filter(p => p.status === "EM_TRANSITO").length,
   }), [pedidos]);
 
-  // Executa transição de status via API
-  const executarAcao = useCallback(async (pedido: Pedido, novoStatus: Status, extra?: { valor_total?: number }) => {
-    const updated = transicao(pedido, novoStatus, user.nome, extra);
+  // Executa uma chamada de API de transição e atualiza a lista com o retorno do servidor
+  const executarAcao = useCallback(async (chamada: () => Promise<unknown>) => {
     setSalvando(true);
     try {
-      const salvo = await api.pedidosOrcamento.updateStatus(pedido.id, {
-        status: updated.status, timeline: updated.timeline, valor_total: updated.valor_total,
-      }) as Pedido;
+      const salvo = await chamada() as Pedido;
       setPedidos(prev => {
         const nova = prev.map(p => p.id === salvo.id ? salvo : p);
         lsSalvar(nova);
@@ -224,10 +204,10 @@ export default function PedidosOrcamento({ user, setor }: Props) {
       setAcaoModal(null);
       setAcaoValor("");
       toast.success("Status atualizado com sucesso!");
-    } catch {
-      toast.error("Erro ao atualizar pedido.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao atualizar pedido.");
     } finally { setSalvando(false); }
-  }, [user.nome, toast]);
+  }, [toast]);
 
   // Confirma ação do modal
   const confirmarAcao = async () => {
@@ -236,17 +216,19 @@ export default function PedidosOrcamento({ user, setor }: Props) {
     if (tipo === "cotacao") {
       const v = parseFloat(acaoValor.replace(",", "."));
       if (isNaN(v) || v <= 0) { toast.error("Informe o valor da cotação."); return; }
-      await executarAcao(pedido, "AGUARDANDO_APROVACAO", { valor_total: v });
-    } else if (tipo === "aprovar") {
-      await executarAcao(pedido, "APROVADO");
+      await executarAcao(() => api.pedidosOrcamento.enviarAprovacaoManutencao(pedido.id, { valor_total: v }));
+    } else if (tipo === "aprovar_manutencao") {
+      await executarAcao(() => api.pedidosOrcamento.aprovarManutencao(pedido.id));
+    } else if (tipo === "aprovar_compra") {
+      await executarAcao(() => api.pedidosOrcamento.aprovarCompra(pedido.id));
     } else if (tipo === "rejeitar") {
       if (!acaoValor.trim()) { toast.error("Informe o motivo da rejeição."); return; }
-      await executarAcao(pedido, "REJEITADO");
+      await executarAcao(() => api.pedidosOrcamento.rejeitar(pedido.id, { motivo: acaoValor }));
     } else if (tipo === "comprar") {
-      if (!acaoValor) { toast.error("Informe a data prevista de entrega."); return; }
-      await executarAcao(pedido, "EM_TRANSITO");
+      if (!acaoValor) { toast.error("Informe a data prevista de recebimento."); return; }
+      await executarAcao(() => api.pedidosOrcamento.registrarCompra(pedido.id, { data_prevista_recebimento: acaoValor }));
     } else if (tipo === "receber") {
-      await executarAcao(pedido, "CONCLUIDO");
+      await executarAcao(() => api.pedidosOrcamento.confirmarRecebimento(pedido.id));
     }
   };
 
@@ -260,15 +242,12 @@ export default function PedidosOrcamento({ user, setor }: Props) {
     if (!form.destino.trim()) { toast.error("Selecione o destino do pedido."); return; }
     const invalido = form.itens.findIndex(i => !i.descricao.trim() || i.quantidade <= 0);
     if (invalido >= 0) { toast.error(`Item ${invalido + 1}: preencha a descrição e quantidade.`); return; }
-    const sc = gerarNumeroSC(pedidos);
     setSalvando(true);
     try {
       await api.pedidosOrcamento.create({
-        numero_sc: sc, data: todayISO(), setor: "MANUTENCAO",
+        data: todayISO(), setor: "MANUTENCAO",
         destino: form.destino, tipo_destino: form.tipo_destino,
         urgencia: form.urgencia, itens: form.itens,
-        valor_total: 0, solicitante: user.nome,
-        timeline: criarTimeline(user.nome),
       });
       await carregar();
       setShowForm(false);
@@ -279,7 +258,7 @@ export default function PedidosOrcamento({ user, setor }: Props) {
     } finally { setSalvando(false); }
   };
 
-  // Botões de ação por papel + status (usados na listagem e no drawer)
+  // Botões de ação por responsabilidade + status (usados na listagem e no drawer)
   const renderBotoes = (p: Pedido, tamanho: "sm" | "md" = "sm") => {
     const cls = tamanho === "md"
       ? "px-4 py-2 rounded-lg text-xs font-bold text-white transition-all hover:-translate-y-0.5 disabled:opacity-60"
@@ -292,9 +271,9 @@ export default function PedidosOrcamento({ user, setor }: Props) {
         {label}
       </button>
     );
-    const btnDireto = (label: string, novoStatus: Status, cor: string) => (
+    const btnDireto = (label: string, chamada: () => Promise<unknown>, cor: string) => (
       <button key={label} disabled={salvando}
-        onClick={() => executarAcao(p, novoStatus)}
+        onClick={() => executarAcao(chamada)}
         className={`${cls} ${cor}`}>
         {label}
       </button>
@@ -302,17 +281,21 @@ export default function PedidosOrcamento({ user, setor }: Props) {
 
     const acoes: React.ReactNode[] = [];
 
-    if (isSup && p.status === "PENDENTE")
-      acoes.push(btnDireto("Iniciar Cotação", "COTANDO", "bg-blue-600 hover:bg-blue-700"));
-    if (isSup && p.status === "COTANDO")
+    if (temResp("cotador") && p.status === "PENDENTE")
+      acoes.push(btnDireto("Iniciar Cotação", () => api.pedidosOrcamento.iniciarCotacao(p.id), "bg-blue-600 hover:bg-blue-700"));
+    if (temResp("cotador") && p.status === "COTANDO")
       acoes.push(btnModal("Enviar para Aprovação", "cotacao", "bg-amber-500 hover:bg-amber-600"));
-    if (isAdmin && p.status === "AGUARDANDO_APROVACAO") {
-      acoes.push(btnModal("Aprovar", "aprovar", "bg-emerald-600 hover:bg-emerald-700"));
+    if (temResp("aprovador_manutencao") && p.status === "AGUARDANDO_APROVACAO_MANUTENCAO") {
+      acoes.push(btnModal("Aprovar Orçamento", "aprovar_manutencao", "bg-emerald-600 hover:bg-emerald-700"));
       acoes.push(btnModal("Rejeitar", "rejeitar", "bg-red-500 hover:bg-red-600"));
     }
-    if (isSup && p.status === "APROVADO")
+    if (temResp("aprovador_suprimentos") && p.status === "AGUARDANDO_APROVACAO_COMPRA") {
+      acoes.push(btnModal("Aprovar Compra", "aprovar_compra", "bg-emerald-600 hover:bg-emerald-700"));
+      acoes.push(btnModal("Rejeitar", "rejeitar", "bg-red-500 hover:bg-red-600"));
+    }
+    if (temResp("comprador") && p.status === "APROVADO")
       acoes.push(btnModal("Registrar Compra", "comprar", "bg-indigo-600 hover:bg-indigo-700"));
-    if ((isManut || papel === "almoxarife") && p.status === "EM_TRANSITO")
+    if (podeConfirmarRecebimento && p.status === "EM_TRANSITO")
       acoes.push(btnModal("Confirmar Recebimento", "receber", "bg-emerald-600 hover:bg-emerald-700"));
 
     return acoes.length ? <div className="flex flex-wrap gap-2">{acoes}</div> : null;
@@ -326,8 +309,8 @@ export default function PedidosOrcamento({ user, setor }: Props) {
 
       <PageHeader
         title="Pedidos de Orçamento"
-        subtitle="Fluxo completo: Solicitação → Cotação → Aprovação → Compra → Recebimento"
-        action={isManut ? (
+        subtitle="Fluxo completo: Solicitação → Cotação → Aprovação Manutenção → Aprovação Compra → Compra → Recebimento"
+        action={temResp("solicitante") ? (
           <button onClick={() => setShowForm(true)}
             className="flex items-center gap-2 bg-gradient-to-r from-[#C75B12] to-[#EA6C0A] px-4 py-2 rounded-lg text-sm font-bold text-white shadow-lg shadow-orange-500/20 hover:-translate-y-0.5 transition-all">
             + Nova Solicitação
@@ -504,10 +487,11 @@ export default function PedidosOrcamento({ user, setor }: Props) {
         isOpen={!!acaoModal}
         onClose={() => { setAcaoModal(null); setAcaoValor(""); }}
         title={
-          acaoModal?.tipo === "cotacao"  ? "Registrar Cotação" :
-          acaoModal?.tipo === "aprovar"  ? "Aprovar Pedido"    :
-          acaoModal?.tipo === "rejeitar" ? "Rejeitar Pedido"   :
-          acaoModal?.tipo === "comprar"  ? "Registrar Compra"  :
+          acaoModal?.tipo === "cotacao"             ? "Registrar Cotação"     :
+          acaoModal?.tipo === "aprovar_manutencao"  ? "Aprovar Orçamento"     :
+          acaoModal?.tipo === "aprovar_compra"      ? "Aprovar Compra"        :
+          acaoModal?.tipo === "rejeitar"            ? "Rejeitar Pedido"       :
+          acaoModal?.tipo === "comprar"             ? "Registrar Compra"      :
           "Confirmar Recebimento"
         }
         size="sm">
@@ -538,14 +522,21 @@ export default function PedidosOrcamento({ user, setor }: Props) {
 
             {acaoModal.tipo === "comprar" && (
               <div>
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Data Prevista de Entrega</label>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Data Prevista de Recebimento</label>
                 <input type="date" min={todayISO()} value={acaoValor} onChange={e => setAcaoValor(e.target.value)} className={inp} autoFocus/>
               </div>
             )}
 
-            {acaoModal.tipo === "aprovar" && (
+            {acaoModal.tipo === "aprovar_manutencao" && (
               <p className="text-xs text-slate-500">
-                Confirma a aprovação deste pedido?
+                Confirma a aprovação do orçamento deste pedido?
+                {acaoModal.pedido.valor_total > 0 ? ` Valor: ${fmtMoeda(acaoModal.pedido.valor_total)}` : ""}
+              </p>
+            )}
+
+            {acaoModal.tipo === "aprovar_compra" && (
+              <p className="text-xs text-slate-500">
+                Confirma a aprovação da compra deste pedido?
                 {acaoModal.pedido.valor_total > 0 ? ` Valor: ${fmtMoeda(acaoModal.pedido.valor_total)}` : ""}
               </p>
             )}
@@ -560,14 +551,15 @@ export default function PedidosOrcamento({ user, setor }: Props) {
               <button onClick={confirmarAcao} disabled={salvando}
                 className={`px-5 py-2 text-xs font-bold text-white rounded-lg transition-all hover:-translate-y-0.5 disabled:opacity-60 ${
                   acaoModal.tipo === "rejeitar" ? "bg-red-600 hover:bg-red-700" :
-                  acaoModal.tipo === "aprovar" || acaoModal.tipo === "receber" ? "bg-emerald-600 hover:bg-emerald-700" :
+                  acaoModal.tipo === "aprovar_manutencao" || acaoModal.tipo === "aprovar_compra" || acaoModal.tipo === "receber" ? "bg-emerald-600 hover:bg-emerald-700" :
                   "bg-gradient-to-r from-[#C75B12] to-[#EA6C0A]"
                 }`}>
                 {salvando ? "Processando..." :
-                  acaoModal.tipo === "cotacao"  ? "Enviar para Aprovação" :
-                  acaoModal.tipo === "aprovar"  ? "Aprovar"               :
-                  acaoModal.tipo === "rejeitar" ? "Rejeitar"              :
-                  acaoModal.tipo === "comprar"  ? "Confirmar Compra"      :
+                  acaoModal.tipo === "cotacao"             ? "Enviar para Aprovação" :
+                  acaoModal.tipo === "aprovar_manutencao"  ? "Aprovar"               :
+                  acaoModal.tipo === "aprovar_compra"      ? "Aprovar"               :
+                  acaoModal.tipo === "rejeitar"             ? "Rejeitar"              :
+                  acaoModal.tipo === "comprar"              ? "Confirmar Compra"      :
                   "Confirmar Recebimento"}
               </button>
             </div>
@@ -613,10 +605,12 @@ export default function PedidosOrcamento({ user, setor }: Props) {
                 ["Tipo",        drawer.tipo_destino === "FROTA" ? "Frota" : drawer.tipo_destino === "OBRA" ? "Obra" : "Equipamento"],
                 ["Data",        fmtDate(drawer.data)],
                 ...(drawer.valor_total > 0 ? [["Valor Total", fmtMoeda(drawer.valor_total)]] : []),
+                ...(drawer.data_prevista_recebimento ? [["Previsão de Recebimento", fmtDate(drawer.data_prevista_recebimento)]] : []),
+                ...(drawer.motivo_rejeicao ? [["Motivo da Rejeição", drawer.motivo_rejeicao]] : []),
               ] as [string, string][]).map(([k, v]) => (
-                <div key={k} className="flex justify-between text-sm">
-                  <span className="text-slate-400 font-medium">{k}</span>
-                  <span className="font-bold text-slate-800">{v}</span>
+                <div key={k} className="flex justify-between text-sm gap-4">
+                  <span className="text-slate-400 font-medium shrink-0">{k}</span>
+                  <span className="font-bold text-slate-800 text-right">{v}</span>
                 </div>
               ))}
 

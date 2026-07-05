@@ -57,7 +57,9 @@ class User extends Authenticatable
 
     public function modulos(): BelongsToMany
     {
-        return $this->belongsToMany(Modulo::class, 'user_modulo');
+        return $this->belongsToMany(Modulo::class, 'user_modulo')
+            ->using(UserModulo::class)
+            ->withPivot('responsabilidades');
     }
 
     public function temModulo(string $chave): bool
@@ -76,5 +78,34 @@ class User extends Authenticatable
     public function temPapel(string ...$papeis): bool
     {
         return in_array($this->papel, $papeis, true) || $this->papel === 'admin_geral';
+    }
+
+    /**
+     * Responsabilidades granulares do usuário DENTRO de um módulo (ex.:
+     * "cotador"/"comprador" em pedido_orcamento), independentes do papel
+     * global. Admin de nível ADMIN acumula todas as responsabilidades
+     * do módulo automaticamente.
+     */
+    public function temResponsabilidade(string $moduloChave, string $responsabilidade): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        $pivot = $this->modulos()->where('chave', $moduloChave)->first()?->pivot;
+        $responsabilidades = $pivot?->responsabilidades ?? [];
+
+        return in_array($responsabilidade, $responsabilidades, true);
+    }
+
+    /**
+     * Mapa {chave_do_modulo: [responsabilidades]} usado para expor ao
+     * frontend quais botões/ações o usuário pode acionar em cada módulo.
+     */
+    public function responsabilidadesPorModulo(): array
+    {
+        return $this->modulos->mapWithKeys(
+            fn (Modulo $modulo) => [$modulo->chave => $modulo->pivot->responsabilidades ?? []]
+        )->all();
     }
 }

@@ -13,9 +13,19 @@ class Modulo extends Model
         'setores_aplicaveis' => 'array',
     ];
 
+    public const RESPONSABILIDADES_PEDIDO_ORCAMENTO = [
+        'solicitante',
+        'cotador',
+        'aprovador_manutencao',
+        'aprovador_suprimentos',
+        'comprador',
+    ];
+
     public function usuarios(): BelongsToMany
     {
-        return $this->belongsToMany(User::class, 'user_modulo');
+        return $this->belongsToMany(User::class, 'user_modulo')
+            ->using(UserModulo::class)
+            ->withPivot('responsabilidades');
     }
 
     /**

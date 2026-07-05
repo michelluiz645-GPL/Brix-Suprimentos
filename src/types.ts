@@ -22,6 +22,21 @@ export const PAPEL_LABELS: Record<Papel, string> = {
   admin_geral:      "Administrador Geral",
 };
 
+export type ResponsabilidadePedidoOrcamento =
+  | "solicitante"
+  | "cotador"
+  | "aprovador_manutencao"
+  | "aprovador_suprimentos"
+  | "comprador";
+
+export const RESPONSABILIDADE_PEDIDO_ORCAMENTO_LABELS: Record<ResponsabilidadePedidoOrcamento, string> = {
+  solicitante:            "Solicitante (Manutenção)",
+  cotador:                "Cotador (Suprimentos)",
+  aprovador_manutencao:   "Aprovador — Manutenção Gestor",
+  aprovador_suprimentos:  "Aprovador — Suprimentos Gestor",
+  comprador:              "Comprador (Suprimentos)",
+};
+
 export interface User {
   id?: number;
   login: string;
@@ -32,6 +47,7 @@ export interface User {
   papel?: Papel | string;
   setor: Setor | string;
   modulos: string[];
+  responsabilidades?: Record<string, string[]>;
   senha?: string;
 }
 
