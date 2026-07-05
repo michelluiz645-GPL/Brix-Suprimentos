@@ -92,15 +92,63 @@ const SECTOR_LABELS: Record<string, string> = {
   MANUTENCAO:   "🔧 Manutenção",
 };
 
+// Traduz o rótulo de menu (usado aqui e no switch de páginas do App.tsx)
+// para a chave de módulo cadastrada no backend (tabela `modulos`), já que
+// user.modulos vem do servidor como chaves ("pedido_orcamento"), não como
+// os rótulos exibidos ("Ped. Orçamento").
+const MENU_PARA_MODULO_CHAVE: Record<string, string> = {
+  "Dashboard":          "dashboard",
+  "Consultar":          "consultar_catalogo",
+  "Entrada":            "registrar_entrada",
+  "Saída":              "registrar_saida",
+  "Histórico Cupons":   "historico_cupons",
+  "Devolução":          "devolucao",
+  "Entregas Pend.":     "entregas_pendentes",
+  "Combustíveis":       "combustiveis",
+  "Produtos":           "fichas_produtos",
+  "Valor Estoque":      "valor_estoque",
+  "Inventário":         "inventario_geral",
+  "Funcionários":       "funcionarios",
+  "Equipes":            "equipes_campo",
+  "Frotas":             "frotas_veiculos",
+  "Reposição Auto.":    "reposicao_automatica",
+  "Ped. Orçamento":     "pedido_orcamento",
+  "Suprimentos Kobo":   "suprimentos_kobo",
+  "Backup":             "seguranca_dados",
+  "Usuários":           "administracao_usuarios",
+  "Obras & Projetos":   "obras_projetos",
+  "Catálogo Obra":      "catalogo_materiais_obra",
+  "Fornecedores":       "fornecedores",
+  "Sol. de Compra":     "solicitacao_compra",
+  "Pedidos de Compra":  "pedido_compra",
+  "EPI":                "seguranca_epi",
+  "Equipamentos":       "equipamentos_pesados",
+  "Débitos Manut.":     "debitos_manutencao",
+  "Rel. Abastecimento": "rel_abastecimentos",
+};
+
+/**
+ * Menus efetivamente acessíveis a um usuário: parte da lista possível do
+ * setor/nível (MENUS_BY_SECTOR) e filtra pelos módulos que ele realmente
+ * tem liberados. Exportado para uso também no cálculo da página inicial
+ * pós-login (App.tsx), evitando duplicar/hardcodear uma página padrão que
+ * pode nem existir para o setor do usuário (ex.: "Dashboard" é exclusivo
+ * do Almoxarifado).
+ */
+export function getMenusDoUsuario(user: UserType, setor: Setor | string): string[] {
+  const nivel = user.nivel || "OPERADOR";
+  const key = `${setor}_${nivel}`;
+  const baseMenus = MENUS_BY_SECTOR[key] ?? MENUS_BY_SECTOR["ALMOXARIFADO_OPERADOR"];
+
+  return user.modulos?.length && nivel !== "ADMIN"
+    ? baseMenus.filter((m) => user.modulos.includes(MENU_PARA_MODULO_CHAVE[m] ?? m))
+    : baseMenus;
+}
+
 export default function Sidebar({ user, setor, activePage, setActivePage, onLogout }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const nivel = user.nivel || "OPERADOR";
-
-  const key = `${setor}_${nivel}`;
-  const baseMenus = MENUS_BY_SECTOR[key] ?? MENUS_BY_SECTOR["ALMOXARIFADO_OPERADOR"];
-  const menus = user.modulos?.length && nivel !== "ADMIN"
-    ? baseMenus.filter((m) => user.modulos.includes(m))
-    : baseMenus;
+  const menus = getMenusDoUsuario(user, setor);
 
   return (
     <div

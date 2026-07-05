@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
-import Sidebar from "@/components/Sidebar";
+import Sidebar, { getMenusDoUsuario } from "@/components/Sidebar";
 import ToastContainer from "@/components/Toast";
 import { useToast } from "@/hooks/useToast";
+import { api } from "@/services/api";
 import type { User, Setor } from "@/types";
 
 import LandingPage    from "@/pages/LandingPage";
@@ -60,6 +61,27 @@ function AppShell() {
         const user = JSON.parse(stored) as User;
         setAuth({ user, setor });
         setActivePage(page);
+
+        // Revalida contra o servidor: módulos/responsabilidades podem ter
+        // sido alterados pelo admin desde o último login, e o cache do
+        // localStorage sozinho nunca refletiria essa mudança.
+        api.auth.me()
+          .then((fresh) => {
+            const u = fresh as User;
+            localStorage.setItem("geplan_user", JSON.stringify(u));
+            setAuth({ user: u, setor });
+
+            // Se a página em cache não existe mais para este usuário
+            // (módulo revogado, ou nunca existiu para o setor dele),
+            // evita deixá-lo numa tela órfã sem item ativo na lateral.
+            const menusAtuais = getMenusDoUsuario(u, setor);
+            if (!menusAtuais.includes(page)) {
+              const novaPage = menusAtuais[0] ?? "Dashboard";
+              setActivePage(novaPage);
+              localStorage.setItem("geplan_page", novaPage);
+            }
+          })
+          .catch(() => { /* mantém os dados em cache (ex: offline) */ });
       } catch { localStorage.clear(); }
     }
     setLoading(false);
@@ -71,9 +93,10 @@ function AppShell() {
     localStorage.setItem("geplan_user",   JSON.stringify(u));
     localStorage.setItem("geplan_setor",  setor);
 
-    const defaultPage = setor === "ENGENHARIA" ? "Obras & Projetos"
-      : setor === "MANUTENCAO" ? "Sol. de Compra"
-      : "Dashboard";
+    // A página inicial é sempre o primeiro módulo que o usuário realmente
+    // tem liberado — nunca um valor fixo por setor, já que a permissão é
+    // individual (RN-002.2) e "Dashboard" nem existe fora do Almoxarifado.
+    const defaultPage = getMenusDoUsuario(u, setor)[0] ?? "Dashboard";
     localStorage.setItem("geplan_page", defaultPage);
 
     setAuth({ user: u, setor });
