@@ -13,13 +13,16 @@ class EnviarAprovacaoManutencaoRequest extends FormRequest
         return [
             'fornecedores'                  => ['required', 'array', 'size:3'],
             'fornecedores.*.nome'            => ['required', 'string', 'max:150'],
-            'fornecedores.*.prazo_entrega'   => ['nullable', 'string', 'max:100'],
             'fornecedores.*.forma_pagamento' => ['nullable', 'string', 'max:100'],
 
-            'itens'              => ['required', 'array', 'min:1'],
-            'itens.*.descricao'  => ['required', 'string', 'max:255'],
-            'itens.*.precos'     => ['required', 'array', 'size:3'],
-            'itens.*.precos.*'   => ['required', 'numeric', 'min:0'],
+            'itens'                              => ['required', 'array', 'min:1'],
+            'itens.*.descricao'                  => ['required', 'string', 'max:255'],
+            'itens.*.quantidade'                 => ['required', 'numeric', 'min:0.01'],
+            'itens.*.unidade'                    => ['required', 'string', 'max:20'],
+            'itens.*.valor_referencia_mercado'    => ['nullable', 'numeric', 'min:0'],
+            'itens.*.fornecedores'                => ['required', 'array', 'size:3'],
+            'itens.*.fornecedores.*.preco'        => ['required', 'numeric', 'min:0'],
+            'itens.*.fornecedores.*.marca'         => ['nullable', 'string', 'max:100'],
         ];
     }
 
@@ -30,7 +33,7 @@ class EnviarAprovacaoManutencaoRequest extends FormRequest
             'fornecedores.size'       => 'A cotação comparativa exige exatamente 3 fornecedores.',
             'fornecedores.*.nome.required' => 'Informe o nome de cada fornecedor.',
             'itens.required'          => 'Adicione ao menos um item ao comparativo.',
-            'itens.*.precos.size'     => 'Informe o preço desse item para os 3 fornecedores.',
+            'itens.*.fornecedores.size' => 'Informe o preço desse item para os 3 fornecedores.',
         ];
     }
 }

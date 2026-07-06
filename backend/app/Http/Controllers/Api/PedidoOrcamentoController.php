@@ -65,7 +65,7 @@ class PedidoOrcamentoController extends Controller
         }
 
         try {
-            $this->service->aprovarManutencao($pedidoOrcamento, $request->user(), $request->validated('fornecedor_escolhido'));
+            $this->service->aprovarManutencao($pedidoOrcamento, $request->user(), $request->validated('escolhas'));
         } catch (\InvalidArgumentException $e) {
             return response()->json(['data' => null, 'message' => $e->getMessage()], 422);
         }
@@ -115,7 +115,11 @@ class PedidoOrcamentoController extends Controller
             return $erro;
         }
 
-        $this->service->registrarCompra($pedidoOrcamento, $request->validated(), $request->user());
+        try {
+            $this->service->registrarCompra($pedidoOrcamento, $request->validated(), $request->user());
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['data' => null, 'message' => $e->getMessage()], 422);
+        }
 
         return response()->json(['data' => $this->serialize($pedidoOrcamento->fresh()), 'message' => 'Compra registrada.']);
     }
@@ -154,10 +158,11 @@ class PedidoOrcamentoController extends Controller
     private function serialize(PedidoOrcamento $p): array
     {
         return [
-            'id'           => $p->id,
-            'numero_sc'    => $p->numero_sc,
-            'data'         => $p->data?->format('Y-m-d'),
-            'setor'        => $p->setor,
+            'id'            => $p->id,
+            'numero_sc'     => $p->numero_sc,
+            'data'          => $p->data?->format('Y-m-d'),
+            'data_desejada' => $p->data_desejada?->format('Y-m-d'),
+            'setor'         => $p->setor,
             'solicitante'  => $p->solicitante?->nome,
             'destino'      => $p->destino,
             'tipo_destino' => $p->tipo_destino,
@@ -165,6 +170,8 @@ class PedidoOrcamentoController extends Controller
             'status'       => $p->status,
             'itens'        => $p->itens,
             'valor_total'  => (float) $p->valor_total,
+            'desconto_negociacao' => (float) $p->desconto_negociacao,
+            'valor_final'  => (float) $p->valor_total - (float) $p->desconto_negociacao,
             'timeline'     => $p->timeline,
 
             'cotacao_fornecedores' => $p->cotacao_fornecedores,
@@ -176,8 +183,6 @@ class PedidoOrcamentoController extends Controller
             'data_aprovacao_manutencao' => $p->data_aprovacao_manutencao?->format('d/m/Y H:i'),
             'aprovado_manutencao_por'   => $p->aprovadoManutencaoPor?->nome,
             'fornecedor_escolhido'      => $p->fornecedor_escolhido,
-            'prazo_entrega_escolhido'   => $p->prazo_entrega_escolhido,
-            'forma_pagamento_escolhida' => $p->forma_pagamento_escolhida,
 
             'data_aprovacao_compra' => $p->data_aprovacao_compra?->format('d/m/Y H:i'),
             'aprovado_compra_por'   => $p->aprovadoCompraPor?->nome,

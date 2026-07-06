@@ -11,14 +11,17 @@ class AprovarManutencaoPedidoOrcamentoRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'fornecedor_escolhido' => ['required', 'string', 'max:150'],
+            'escolhas'                     => ['required', 'array', 'min:1'],
+            'escolhas.*.fornecedor_indice' => ['required', 'integer', 'between:0,2'],
+            'escolhas.*.justificativa'     => ['nullable', 'string', 'max:500'],
         ];
     }
 
     public function messages(): array
     {
         return [
-            'fornecedor_escolhido.required' => 'Selecione o fornecedor vencedor desta cotação.',
+            'escolhas.required' => 'Escolha o fornecedor vencedor de cada item.',
+            'escolhas.*.fornecedor_indice.required' => 'Escolha o fornecedor vencedor de cada item.',
         ];
     }
 }

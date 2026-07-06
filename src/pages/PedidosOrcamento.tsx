@@ -22,17 +22,18 @@ interface TimelineStep {
 }
 interface Pedido {
   id: number; numero_sc: string; data: string;
+  data_desejada?: string | null;
   setor: string; destino: string; tipo_destino: TipoDestino;
   urgencia: Urgencia; status: Status;
   itens: Item[]; valor_total: number; solicitante: string;
+  desconto_negociacao?: number;
+  valor_final?: number;
   timeline: TimelineStep[];
   cotado_por?: string | null;
   cotacao_fornecedores?: Fornecedor[] | null;
   cotacao_itens?: ItemComparativo[] | null;
   aprovado_manutencao_por?: string | null;
   fornecedor_escolhido?: string | null;
-  prazo_entrega_escolhido?: string | null;
-  forma_pagamento_escolhida?: string | null;
   aprovado_compra_por?: string | null;
   comprado_por?: string | null;
   data_prevista_recebimento?: string | null;
@@ -57,7 +58,7 @@ const RESPONSABILIDADES_TODAS: ResponsabilidadePedidoOrcamento[] = [
 const STATUS_LABEL: Record<Status, string> = {
   PENDENTE:"Pendente", COTANDO:"Cotando",
   AGUARDANDO_APROVACAO_MANUTENCAO:"Ag. Aprov. Manutenção", AGUARDANDO_APROVACAO_COMPRA:"Ag. Aprov. Compra",
-  APROVADO:"Compra Aprovada", EM_TRANSITO:"Em Trânsito", CONCLUIDO:"Concluído", REJEITADO:"Rejeitado",
+  APROVADO:"Pendente de Compra", EM_TRANSITO:"Em Trânsito", CONCLUIDO:"Concluído", REJEITADO:"Rejeitado",
 };
 const STATUS_COLOR: Record<Status, string> = {
   PENDENTE:"bg-slate-100 text-slate-600", COTANDO:"bg-blue-100 text-blue-700",
@@ -81,7 +82,7 @@ const STATUS_DA_ABA: Record<string, Status[]> = {
   "Em Cotação":         ["COTANDO"],
   "Aprovar Orçamento":  ["AGUARDANDO_APROVACAO_MANUTENCAO"],
   "Aprovar Compra":     ["AGUARDANDO_APROVACAO_COMPRA"],
-  "Aprovadas":          ["APROVADO"],
+  "Pendente de Compra": ["APROVADO"],
   "Em Trânsito":        ["EM_TRANSITO"],
   "Concluído":          ["CONCLUIDO"],
 };
@@ -116,7 +117,7 @@ export default function PedidosOrcamento({ user, setor }: Props) {
   // "Confirmar Recebimento" continua gated por papel/setor, como já era.
   const podeConfirmarRecebimento = papel === "op_manutencao" || papel === "admin_manutencao" || papel === "almoxarife" || papel === "admin_geral";
 
-  // Pendentes/Aprovadas/Em Trânsito/Concluído são um painel geral, somente
+  // Pendentes/Pendente de Compra/Em Trânsito/Concluído são um painel geral, somente
   // leitura, visível para qualquer um com acesso ao módulo — só as filas de
   // ação (Em Cotação, Aprovar Orçamento, Aprovar Compra) continuam restritas
   // a quem tem a responsabilidade correspondente.
@@ -127,7 +128,7 @@ export default function PedidosOrcamento({ user, setor }: Props) {
     if (temResp("cotador"))                lista.push("Em Cotação");
     if (temResp("aprovador_manutencao"))    lista.push("Aprovar Orçamento");
     if (temResp("aprovador_suprimentos"))   lista.push("Aprovar Compra");
-    lista.push("Aprovadas", "Em Trânsito", "Concluído");
+    lista.push("Pendente de Compra", "Em Trânsito", "Concluído");
     return lista;
   }, [temResp]);
 
@@ -140,6 +141,7 @@ export default function PedidosOrcamento({ user, setor }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [acaoModal,  setAcaoModal]  = useState<{ pedido: Pedido; tipo: TipoAcao } | null>(null);
   const [acaoValor,  setAcaoValor]  = useState("");
+  const [acaoDesconto, setAcaoDesconto] = useState("");
   const [comparativoModal, setComparativoModal] = useState<{ pedido: Pedido; modo: "editar" | "aprovar" | "visualizar" } | null>(null);
   const [filtroBusca,   setFiltroBusca]   = useState("");
   const [filtroDataDe,  setFiltroDataDe]  = useState("");
@@ -147,7 +149,7 @@ export default function PedidosOrcamento({ user, setor }: Props) {
 
   const [form, setForm] = useState({
     urgencia: "MEDIA" as Urgencia, tipo_destino: "FROTA" as TipoDestino,
-    destino: "", itens: [{ ...ITEM_VAZIO }] as Item[],
+    destino: "", data_desejada: "", itens: [{ ...ITEM_VAZIO }] as Item[],
   });
 
   const carregar = useCallback(() => {
@@ -235,6 +237,7 @@ export default function PedidosOrcamento({ user, setor }: Props) {
       setDrawer(d => d?.id === salvo.id ? salvo : d);
       setAcaoModal(null);
       setAcaoValor("");
+      setAcaoDesconto("");
       setComparativoModal(null);
       toast.success("Status atualizado com sucesso!");
     } catch (err) {
@@ -253,7 +256,9 @@ export default function PedidosOrcamento({ user, setor }: Props) {
       await executarAcao(() => api.pedidosOrcamento.rejeitar(pedido.id, { motivo: acaoValor }));
     } else if (tipo === "comprar") {
       if (!acaoValor) { toast.error("Informe a data prevista de recebimento."); return; }
-      await executarAcao(() => api.pedidosOrcamento.registrarCompra(pedido.id, { data_prevista_recebimento: acaoValor }));
+      const desconto = acaoDesconto ? parseFloat(acaoDesconto.replace(",", ".")) : 0;
+      if (desconto > pedido.valor_total) { toast.error("O desconto não pode ser maior que o valor total aprovado."); return; }
+      await executarAcao(() => api.pedidosOrcamento.registrarCompra(pedido.id, { data_prevista_recebimento: acaoValor, desconto_negociacao: desconto }));
     } else if (tipo === "receber") {
       await executarAcao(() => api.pedidosOrcamento.confirmarRecebimento(pedido.id));
     }
@@ -272,13 +277,13 @@ export default function PedidosOrcamento({ user, setor }: Props) {
     setSalvando(true);
     try {
       await api.pedidosOrcamento.create({
-        data: todayISO(), setor: "MANUTENCAO",
+        data: todayISO(), data_desejada: form.data_desejada || null, setor: "MANUTENCAO",
         destino: form.destino, tipo_destino: form.tipo_destino,
         urgencia: form.urgencia, itens: form.itens,
       });
       await carregar();
       setShowForm(false);
-      setForm({ urgencia: "MEDIA", tipo_destino: "FROTA", destino: "", itens: [{ ...ITEM_VAZIO }] });
+      setForm({ urgencia: "MEDIA", tipo_destino: "FROTA", destino: "", data_desejada: "", itens: [{ ...ITEM_VAZIO }] });
       toast.success("Solicitação enviada para o Suprimentos!");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao criar solicitação.");
@@ -293,7 +298,7 @@ export default function PedidosOrcamento({ user, setor }: Props) {
 
     const btnModal = (label: string, tipo: TipoAcao, cor: string) => (
       <button key={label} disabled={salvando}
-        onClick={() => { setAcaoModal({ pedido: p, tipo }); setAcaoValor(""); }}
+        onClick={() => { setAcaoModal({ pedido: p, tipo }); setAcaoValor(""); setAcaoDesconto(""); }}
         className={`${cls} ${cor}`}>
         {label}
       </button>
@@ -473,7 +478,7 @@ export default function PedidosOrcamento({ user, setor }: Props) {
       {/* Modal: Nova Solicitação */}
       <Modal isOpen={showForm} onClose={() => setShowForm(false)} title="Nova Solicitação de Orçamento" size="lg">
         <div className="space-y-5 text-sm">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Urgência</label>
               <select value={form.urgencia} onChange={e => setForm(p => ({ ...p, urgencia:e.target.value as Urgencia }))} className={inp}>
@@ -490,6 +495,10 @@ export default function PedidosOrcamento({ user, setor }: Props) {
                 <option value="OBRA">Obra</option>
                 <option value="EQUIPAMENTO">Equipamento interno</option>
               </select>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Data Desejada do Material</label>
+              <input type="date" min={todayISO()} value={form.data_desejada} onChange={e => setForm(p => ({ ...p, data_desejada:e.target.value }))} className={inp}/>
             </div>
           </div>
 
@@ -542,7 +551,7 @@ export default function PedidosOrcamento({ user, setor }: Props) {
       {/* Modal: Ação de status */}
       <Modal
         isOpen={!!acaoModal}
-        onClose={() => { setAcaoModal(null); setAcaoValor(""); }}
+        onClose={() => { setAcaoModal(null); setAcaoValor(""); setAcaoDesconto(""); }}
         title={
           acaoModal?.tipo === "aprovar_compra"      ? "Aprovar Compra"        :
           acaoModal?.tipo === "rejeitar"            ? "Rejeitar Pedido"       :
@@ -565,9 +574,23 @@ export default function PedidosOrcamento({ user, setor }: Props) {
             )}
 
             {acaoModal.tipo === "comprar" && (
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Data Prevista de Recebimento</label>
-                <input type="date" min={todayISO()} value={acaoValor} onChange={e => setAcaoValor(e.target.value)} className={inp} autoFocus/>
+              <div className="space-y-3">
+                <p className="text-xs text-slate-500">Valor aprovado: <strong className="text-slate-700">{fmtMoeda(acaoModal.pedido.valor_total)}</strong></p>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Data Prevista de Recebimento</label>
+                  <input type="date" min={todayISO()} value={acaoValor} onChange={e => setAcaoValor(e.target.value)} className={inp} autoFocus/>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Desconto por Negociação (R$, opcional)</label>
+                  <input type="number" min="0" step="0.01" max={acaoModal.pedido.valor_total}
+                    value={acaoDesconto} onChange={e => setAcaoDesconto(e.target.value)}
+                    placeholder="Ex: 150.00" className={inp}/>
+                  {!!acaoDesconto && parseFloat(acaoDesconto.replace(",", ".")) > 0 && (
+                    <p className="text-[11px] text-emerald-600 font-semibold mt-1">
+                      Valor final: {fmtMoeda(acaoModal.pedido.valor_total - (parseFloat(acaoDesconto.replace(",", ".")) || 0))}
+                    </p>
+                  )}
+                </div>
               </div>
             )}
 
@@ -583,7 +606,7 @@ export default function PedidosOrcamento({ user, setor }: Props) {
             )}
 
             <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
-              <button onClick={() => { setAcaoModal(null); setAcaoValor(""); }}
+              <button onClick={() => { setAcaoModal(null); setAcaoValor(""); setAcaoDesconto(""); }}
                 className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200">Cancelar</button>
               <button onClick={confirmarAcao} disabled={salvando}
                 className={`px-5 py-2 text-xs font-bold text-white rounded-lg transition-all hover:-translate-y-0.5 disabled:opacity-60 ${
@@ -618,6 +641,7 @@ export default function PedidosOrcamento({ user, setor }: Props) {
             setor={comparativoModal.pedido.setor}
             destino={comparativoModal.pedido.destino}
             data={fmtDate(comparativoModal.pedido.data)}
+            dataDesejada={comparativoModal.pedido.data_desejada}
             itensIniciais={comparativoModal.pedido.itens}
             fornecedores={comparativoModal.pedido.cotacao_fornecedores}
             itensComparativo={comparativoModal.pedido.cotacao_itens}
@@ -627,8 +651,8 @@ export default function PedidosOrcamento({ user, setor }: Props) {
             onSalvar={(dados) => executarAcao(() =>
               api.pedidosOrcamento.enviarAprovacaoManutencao(comparativoModal.pedido.id, dados)
             )}
-            onAprovar={(fornecedorEscolhido) => executarAcao(() =>
-              api.pedidosOrcamento.aprovarManutencao(comparativoModal.pedido.id, { fornecedor_escolhido: fornecedorEscolhido })
+            onAprovar={(escolhas) => executarAcao(() =>
+              api.pedidosOrcamento.aprovarManutencao(comparativoModal.pedido.id, { escolhas })
             )}
           />
         )}
@@ -671,10 +695,11 @@ export default function PedidosOrcamento({ user, setor }: Props) {
                 ["Destino",     drawer.destino],
                 ["Tipo",        drawer.tipo_destino === "FROTA" ? "Frota" : drawer.tipo_destino === "OBRA" ? "Obra" : "Equipamento"],
                 ["Data",        fmtDate(drawer.data)],
-                ...(drawer.fornecedor_escolhido ? [["Fornecedor Escolhido", drawer.fornecedor_escolhido]] : []),
-                ...(drawer.prazo_entrega_escolhido ? [["Prazo de Entrega", drawer.prazo_entrega_escolhido]] : []),
-                ...(drawer.forma_pagamento_escolhida ? [["Forma de Pagamento", drawer.forma_pagamento_escolhida]] : []),
-                ...(drawer.valor_total > 0 ? [["Valor Total", fmtMoeda(drawer.valor_total)]] : []),
+                ...(drawer.data_desejada ? [["Data Desejada", fmtDate(drawer.data_desejada)]] : []),
+                ...(drawer.fornecedor_escolhido ? [["Fornecedor(es) Escolhido(s)", drawer.fornecedor_escolhido]] : []),
+                ...(drawer.valor_total > 0 ? [["Valor Aprovado", fmtMoeda(drawer.valor_total)]] : []),
+                ...(drawer.desconto_negociacao ? [["Desconto por Negociação", fmtMoeda(drawer.desconto_negociacao)]] : []),
+                ...(drawer.desconto_negociacao ? [["Valor Final da Compra", fmtMoeda(drawer.valor_final ?? drawer.valor_total)]] : []),
                 ...(drawer.data_prevista_recebimento ? [["Previsão de Recebimento", fmtDate(drawer.data_prevista_recebimento)]] : []),
                 ...(drawer.motivo_rejeicao ? [["Motivo da Rejeição", drawer.motivo_rejeicao]] : []),
               ] as [string, string][]).map(([k, v]) => (

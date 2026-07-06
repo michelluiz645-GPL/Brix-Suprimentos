@@ -12,6 +12,7 @@ class RegistrarCompraPedidoOrcamentoRequest extends FormRequest
     {
         return [
             'data_prevista_recebimento' => ['required', 'date', 'after_or_equal:today'],
+            'desconto_negociacao'       => ['nullable', 'numeric', 'min:0'],
         ];
     }
 
@@ -20,6 +21,7 @@ class RegistrarCompraPedidoOrcamentoRequest extends FormRequest
         return [
             'data_prevista_recebimento.required'       => 'A data prevista de recebimento é obrigatória.',
             'data_prevista_recebimento.after_or_equal'  => 'A data prevista não pode ser no passado.',
+            'desconto_negociacao.min'                   => 'O desconto não pode ser negativo.',
         ];
     }
 }

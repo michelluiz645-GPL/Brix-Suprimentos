@@ -40,6 +40,7 @@ class PedidoOrcamentoService
             $pedido = PedidoOrcamento::create([
                 'numero_sc'      => $dados['numero_sc'] ?? $this->gerarNumero(),
                 'data'           => $dados['data'],
+                'data_desejada'  => $dados['data_desejada'] ?? null,
                 'setor'          => $dados['setor'] ?? 'MANUTENCAO',
                 'solicitante_id' => $solicitante->id,
                 'destino'        => $dados['destino'],
@@ -90,33 +91,62 @@ class PedidoOrcamentoService
     }
 
     /**
-     * A Manutenção escolhe UM fornecedor vencedor entre os 3 cotados — o
-     * valor_total, prazo de entrega e forma de pagamento definitivos do
-     * pedido vêm desse fornecedor escolhido (soma dos preços dele em cada
-     * item do comparativo).
+     * A Manutenção escolhe o fornecedor vencedor de CADA item do comparativo
+     * (vencedor misto é permitido: item 1 do fornecedor A, item 2 do
+     * fornecedor B). Quando o escolhido não é o mais barato daquele item, a
+     * justificativa é obrigatória. valor_total é a soma de (preço unitário ×
+     * quantidade) de cada item, no fornecedor efetivamente escolhido;
+     * fornecedor_escolhido guarda um resumo (nomes únicos dos fornecedores
+     * vencedores) para exibição rápida em listagem.
      *
-     * @throws \InvalidArgumentException se o fornecedor não estiver entre os cotados
+     * @param array<int, array{fornecedor_indice: int, justificativa: ?string}> $escolhas uma entrada por item, na mesma ordem de cotacao_itens
+     * @throws \InvalidArgumentException se a quantidade de escolhas não bater com os itens, o índice for inválido, ou faltar justificativa
      */
-    public function aprovarManutencao(PedidoOrcamento $pedido, User $aprovador, string $fornecedorEscolhido): void
+    public function aprovarManutencao(PedidoOrcamento $pedido, User $aprovador, array $escolhas): void
     {
         $statusAnterior = $pedido->status;
+        $itens          = $pedido->cotacao_itens ?? [];
         $fornecedores   = $pedido->cotacao_fornecedores ?? [];
 
-        $indice = collect($fornecedores)->search(fn (array $f) => $f['nome'] === $fornecedorEscolhido);
-
-        if ($indice === false) {
-            throw new \InvalidArgumentException('Fornecedor escolhido não faz parte desta cotação.');
+        if (count($escolhas) !== count($itens)) {
+            throw new \InvalidArgumentException('É preciso escolher um fornecedor para cada item do comparativo.');
         }
 
-        $valorTotal = collect($pedido->cotacao_itens ?? [])->sum(fn (array $item) => (float) ($item['precos'][$indice] ?? 0));
+        $valorTotal = 0;
+        $nomesEscolhidos = [];
+        $itensAtualizados = [];
+
+        foreach ($itens as $i => $item) {
+            $indiceEscolhido = $escolhas[$i]['fornecedor_indice'];
+            $justificativa   = $escolhas[$i]['justificativa'] ?? null;
+
+            if (! isset($item['fornecedores'][$indiceEscolhido])) {
+                throw new \InvalidArgumentException("Fornecedor inválido para o item \"{$item['descricao']}\".");
+            }
+
+            $precos = array_column($item['fornecedores'], 'preco');
+            $indiceMaisBarato = array_search(min($precos), $precos, true);
+
+            if ($indiceEscolhido !== $indiceMaisBarato && ! $justificativa) {
+                throw new \InvalidArgumentException("Justifique a escolha de um fornecedor que não é o mais barato no item \"{$item['descricao']}\".");
+            }
+
+            $valorTotal += (float) $item['fornecedores'][$indiceEscolhido]['preco'] * (float) $item['quantidade'];
+            $nomesEscolhidos[$fornecedores[$indiceEscolhido]['nome'] ?? ''] = true;
+
+            $itensAtualizados[] = [
+                ...$item,
+                'fornecedor_escolhido_indice' => $indiceEscolhido,
+                'justificativa_escolha'       => $justificativa,
+            ];
+        }
 
         $pedido->update([
             'status'                     => 'AGUARDANDO_APROVACAO_COMPRA',
             'aprovado_manutencao_por_id' => $aprovador->id,
             'data_aprovacao_manutencao'  => now(),
-            'fornecedor_escolhido'       => $fornecedorEscolhido,
-            'prazo_entrega_escolhido'    => $fornecedores[$indice]['prazo_entrega'] ?? null,
-            'forma_pagamento_escolhida'  => $fornecedores[$indice]['forma_pagamento'] ?? null,
+            'cotacao_itens'              => $itensAtualizados,
+            'fornecedor_escolhido'       => implode(', ', array_keys(array_filter($nomesEscolhidos, fn ($_, $k) => $k !== '', ARRAY_FILTER_USE_BOTH))),
             'valor_total'                => $valorTotal,
         ]);
 
@@ -161,15 +191,24 @@ class PedidoOrcamentoService
         $this->notificar(['op_suprimentos'], "Pedido {$pedido->numero_sc} com compra aprovada — pronto para compra.");
     }
 
+    /**
+     * @throws \InvalidArgumentException se o desconto negociado for maior que o valor total aprovado
+     */
     public function registrarCompra(PedidoOrcamento $pedido, array $dados, User $comprador): void
     {
         $statusAnterior = $pedido->status;
+        $desconto = (float) ($dados['desconto_negociacao'] ?? 0);
+
+        if ($desconto > (float) $pedido->valor_total) {
+            throw new \InvalidArgumentException('O desconto negociado não pode ser maior que o valor total aprovado.');
+        }
 
         $pedido->update([
             'status'                    => 'EM_TRANSITO',
             'comprado_por_id'           => $comprador->id,
             'data_compra'               => now(),
             'data_prevista_recebimento' => $dados['data_prevista_recebimento'],
+            'desconto_negociacao'       => $desconto,
         ]);
 
         $this->avancarTimeline($pedido, $statusAnterior, $comprador->nome);

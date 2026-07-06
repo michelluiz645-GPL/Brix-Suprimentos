@@ -13,6 +13,7 @@ class CriarPedidoOrcamentoRequest extends FormRequest
         return [
             'numero_sc'    => ['nullable', 'string', 'unique:pedidos_orcamento,numero_sc'],
             'data'         => ['required', 'date'],
+            'data_desejada' => ['nullable', 'date', 'after_or_equal:data'],
             'destino'      => ['required', 'string', 'max:150'],
             'tipo_destino' => ['required', 'in:FROTA,OBRA,EQUIPAMENTO'],
             'urgencia'     => ['required', 'in:CRITICA,ALTA,MEDIA,BAIXA'],
@@ -29,6 +30,7 @@ class CriarPedidoOrcamentoRequest extends FormRequest
             'numero_sc.unique'  => 'Este número de SC já existe.',
             'itens.required'    => 'Adicione ao menos um item.',
             'destino.required'  => 'O destino é obrigatório.',
+            'data_desejada.after_or_equal' => 'A data desejada não pode ser anterior à data do pedido.',
         ];
     }
 }
