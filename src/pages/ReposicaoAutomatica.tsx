@@ -34,17 +34,18 @@ export default function ReposicaoAutomatica() {
   const criticos = produtos.filter((p) =>
     p.status !== "INATIVO" &&
     p.estoque_min > 0 &&
-    p.estoque <= p.estoque_min
+    (p.estoque_total ?? 0) <= p.estoque_min
   );
 
   const qtdSugerida = (p: Product): number => {
+    const estoqueTotal = p.estoque_total ?? 0;
     if (p.estoque_max && p.estoque_max > 0) {
-      return Math.max(0, p.estoque_max - p.estoque);
+      return Math.max(0, p.estoque_max - estoqueTotal);
     }
-    return Math.max(0, p.estoque_min * 2 - p.estoque);
+    return Math.max(0, p.estoque_min * 2 - estoqueTotal);
   };
 
-  const urgencia = (p: Product) => p.estoque === 0 ? "Crítica" : "Normal";
+  const urgencia = (p: Product) => (p.estoque_total ?? 0) === 0 ? "Crítica" : "Normal";
 
   const abrirModal = (p: Product) => setModal({ produto: p, qtd_sugerida: qtdSugerida(p), data_entrega: today() });
 
@@ -65,7 +66,7 @@ export default function ReposicaoAutomatica() {
           nome: modal.produto.nome,
           qtd: modal.qtd_sugerida,
           unid: modal.produto.unid,
-          preco: modal.produto.preco,
+          preco: modal.produto.preco_min ?? 0,
           desconto: 0,
         }],
         status: "PENDENTE",
@@ -121,8 +122,8 @@ export default function ReposicaoAutomatica() {
                       <td className="p-3 font-medium text-slate-800">{p.nome}</td>
                       <td className="p-3 text-slate-500">{p.categoria}</td>
                       <td className="p-3">
-                        <span className={`font-mono font-bold ${(p.estoque ?? 0) === 0 ? "text-rose-600" : "text-amber-600"}`}>
-                          {p.estoque ?? 0} {p.unid}
+                        <span className={`font-mono font-bold ${(p.estoque_total ?? 0) === 0 ? "text-rose-600" : "text-amber-600"}`}>
+                          {p.estoque_total ?? 0} {p.unid}
                         </span>
                       </td>
                       <td className="p-3 font-mono text-slate-500">{p.estoque_min} {p.unid}</td>
@@ -159,7 +160,7 @@ export default function ReposicaoAutomatica() {
               <div className="bg-slate-50 rounded-xl p-4 space-y-2 text-xs">
                 <div className="flex justify-between">
                   <span className="text-slate-500">Estoque atual</span>
-                  <span className="font-mono font-bold text-rose-600">{modal.produto.estoque} {modal.produto.unid}</span>
+                  <span className="font-mono font-bold text-rose-600">{modal.produto.estoque_total ?? 0} {modal.produto.unid}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Estoque mínimo</span>
@@ -173,7 +174,7 @@ export default function ReposicaoAutomatica() {
                 )}
                 <div className="flex justify-between border-t border-slate-200 pt-2 mt-2">
                   <span className="text-slate-500">Preço estimado</span>
-                  <span className="font-mono font-bold">{formatCurrency(modal.produto.preco)}</span>
+                  <span className="font-mono font-bold">{formatCurrency(modal.produto.preco_min ?? 0)}</span>
                 </div>
               </div>
 

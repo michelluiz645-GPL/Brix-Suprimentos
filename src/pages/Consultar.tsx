@@ -6,6 +6,12 @@ import { formatCurrency } from "@/utils/formatters";
 import type { Product } from "@/types";
 import { Search } from "lucide-react";
 
+const fmtPrecoRange = (p: Product) => {
+  const min = p.preco_min ?? 0;
+  const max = p.preco_max ?? 0;
+  return min === max ? formatCurrency(min) : `${formatCurrency(min)} – ${formatCurrency(max)}`;
+};
+
 export default function Consultar() {
   const [products, setProducts]   = useState<Product[]>([]);
   const [search, setSearch]       = useState("");
@@ -72,17 +78,18 @@ export default function Consultar() {
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {filtered.slice(0, 50).map((p) => {
-                  const isCritical = Number(p.estoque_min ?? 0) > 0 && Number(p.estoque ?? 0) <= Number(p.estoque_min ?? 0);
+                  const estoqueTotal = p.estoque_total ?? 0;
+                  const isCritical = Number(p.estoque_min ?? 0) > 0 && estoqueTotal <= Number(p.estoque_min ?? 0);
                   return (
                     <tr key={p.id ?? p.codigo_produto} className="hover:bg-slate-50/50">
                       <td className="p-3 font-mono font-bold text-slate-600">{p.codigo_produto}</td>
                       <td className="p-3 font-semibold text-slate-800">{p.nome}</td>
                       <td className="p-3 text-slate-500">{p.categoria}</td>
                       <td className="p-3 text-slate-500">{p.unid}</td>
-                      <td className="p-3 font-mono text-slate-700">{formatCurrency(p.preco)}</td>
+                      <td className="p-3 font-mono text-slate-700">{fmtPrecoRange(p)}</td>
                       <td className="p-3">
                         <span className={`font-mono font-bold ${isCritical ? "text-rose-600" : "text-slate-700"}`}>
-                          {p.estoque}
+                          {estoqueTotal}
                           {isCritical && " ⚠️"}
                         </span>
                       </td>
@@ -119,8 +126,7 @@ export default function Consultar() {
                 ["Nome",         selected.nome],
                 ["Categoria",    selected.categoria],
                 ["Unidade",      selected.unid],
-                ["Preço Unit.",  formatCurrency(selected.preco)],
-                ["Estoque",      selected.estoque],
+                ["Estoque Total", selected.estoque_total ?? 0],
                 ["Estoque Mín.", selected.estoque_min],
                 ["Estoque Máx.", selected.estoque_max],
                 ["Armário",      selected.armario],
@@ -131,6 +137,19 @@ export default function Consultar() {
                   <div className="font-semibold text-slate-800">{value ?? "—"}</div>
                 </div>
               ))}
+            </div>
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Marcas / Variações</div>
+              <div className="space-y-1.5">
+                {(selected.variacoes ?? []).map((v, i) => (
+                  <div key={v.id ?? i} className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2">
+                    <span className="font-semibold text-slate-700">
+                      {v.marca || "—"}{v.codigo_fabricante && <span className="text-slate-400 font-mono text-xs ml-1">({v.codigo_fabricante})</span>}
+                    </span>
+                    <span className="font-mono text-slate-600 text-xs">{formatCurrency(v.preco)} · {v.estoque} {selected.unid.toLowerCase()}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}

@@ -57,20 +57,33 @@ export interface AuthState {
   setor: Setor | string;
 }
 
+export interface ProdutoVariacao {
+  id?: number;
+  marca: string;
+  codigo_fabricante?: string;
+  preco: number;
+  estoque: number;
+  status?: "ATIVO" | "INATIVO";
+}
+
 export interface Product {
   id?: number;
   codigo_produto: string;
   nome: string;
   categoria: string;
   unid: string;
-  preco: number;
-  estoque: number;
   estoque_min: number;
   estoque_max: number;
   armario: string;
   prateleira: string;
   dias_validade_epi?: number;
   status?: "ATIVO" | "INATIVO";
+  variacoes: ProdutoVariacao[];
+  // Agregados calculados pelo backend a partir das variações (marcas) ativas
+  estoque_total?: number;
+  valor_total?: number;
+  preco_min?: number;
+  preco_max?: number;
 }
 
 export interface Movement {

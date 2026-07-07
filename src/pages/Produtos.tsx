@@ -4,8 +4,8 @@ import PageHeader from "@/components/PageHeader";
 import { useToast } from "@/hooks/useToast";
 import ToastContainer from "@/components/Toast";
 import { formatCurrency } from "@/utils/formatters";
-import type { Product } from "@/types";
-import { Search, Plus, Edit2, EyeOff } from "lucide-react";
+import type { Product, ProdutoVariacao } from "@/types";
+import { Search, Plus, Edit2, EyeOff, Trash2 } from "lucide-react";
 
 const CATEGORIAS = [
   "FILTROS","ÓLEOS","GRAXAS","LUBRIFICANTES","COMBUSTÍVEL","PEÇAS MOTOR",
@@ -16,13 +16,16 @@ const CATEGORIAS = [
 ];
 const UNIDADES = ["UNID","METROS","LITROS","KG"];
 
-type FormProd = Omit<Product, "id">;
+type FormProd = Omit<Product, "id" | "estoque_total" | "valor_total" | "preco_min" | "preco_max">;
 type Aba = "lista" | "novo" | "editar";
+
+const variacaoVazia = (): ProdutoVariacao => ({ marca: "", codigo_fabricante: "", preco: 0, estoque: 0 });
 
 const emptyForm = (): FormProd => ({
   codigo_produto: "", nome: "", categoria: "", unid: "UNID",
-  preco: 0, estoque: 0, estoque_min: 0, estoque_max: 0,
+  estoque_min: 0, estoque_max: 0,
   armario: "", prateleira: "", dias_validade_epi: 0, status: "ATIVO",
+  variacoes: [variacaoVazia()],
 });
 
 const inputCls = "w-full px-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#EA6C0A] transition-colors";
@@ -43,6 +46,12 @@ function FormProduto({ form, setForm, onSubmit, salvando, modo, onCancel }: Form
     setForm((prev) => ({ ...prev, [campo]: val }));
   };
 
+  const setVariacao = (idx: number, campo: keyof ProdutoVariacao, valor: string | number) => {
+    setForm((prev) => ({ ...prev, variacoes: prev.variacoes.map((v, i) => i === idx ? { ...v, [campo]: valor } : v) }));
+  };
+  const addVariacao = () => setForm((prev) => ({ ...prev, variacoes: [...prev.variacoes, variacaoVazia()] }));
+  const removeVariacao = (idx: number) => setForm((prev) => ({ ...prev, variacoes: prev.variacoes.filter((_, i) => i !== idx) }));
+
   return (
     <form onSubmit={onSubmit} className="bg-white border border-slate-100 rounded-xl p-5 shadow-sm space-y-6">
       <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -55,13 +64,13 @@ function FormProduto({ form, setForm, onSubmit, salvando, modo, onCancel }: Form
             value={form.codigo_produto}
             onChange={set("codigo_produto")}
             disabled={modo === "editar"}
-            placeholder="Ex: 7891234567890 ou MTR-001"
+            placeholder="Ex: FLT-001"
             className={`${inputCls} ${modo === "editar" ? "opacity-60 cursor-not-allowed" : ""}`}
           />
         </div>
         <div className="md:col-span-2">
           <label className={labelCls}>Nome *</label>
-          <input value={form.nome} onChange={set("nome")} placeholder="Nome completo do produto" className={inputCls} />
+          <input value={form.nome} onChange={set("nome")} placeholder="Nome completo do produto (ex: Filtro de Óleo Motor X)" className={inputCls} />
         </div>
         <div>
           <label className={labelCls}>Categoria *</label>
@@ -77,17 +86,7 @@ function FormProduto({ form, setForm, onSubmit, salvando, modo, onCancel }: Form
           </select>
         </div>
         <div>
-          <label className={labelCls}>Preço Unitário (R$)</label>
-          <input type="number" min={0} step="0.01" value={form.preco} onChange={set("preco")} className={inputCls} />
-        </div>
-        {modo === "criar" && (
-          <div>
-            <label className={labelCls}>Estoque Inicial</label>
-            <input type="number" min={0} value={form.estoque} onChange={set("estoque")} className={inputCls} />
-          </div>
-        )}
-        <div>
-          <label className={labelCls}>Estoque Mínimo</label>
+          <label className={labelCls}>Estoque Mínimo (total, somando marcas)</label>
           <input type="number" min={0} value={form.estoque_min} onChange={set("estoque_min")} className={inputCls} />
         </div>
         <div>
@@ -115,6 +114,61 @@ function FormProduto({ form, setForm, onSubmit, salvando, modo, onCancel }: Form
           </div>
         )}
       </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+            Marcas / Variações Equivalentes
+          </h4>
+          <button type="button" onClick={addVariacao} className="flex items-center gap-1.5 text-xs font-bold text-[#EA6C0A] hover:underline">
+            <Plus size={14} /> Adicionar marca
+          </button>
+        </div>
+        <p className="text-[10px] text-slate-400 mb-3">
+          Itens equivalentes de marcas diferentes (ex: filtro WEGA FCD4000 e TECFIL PSC706) — cada marca tem seu próprio preço e estoque, mas aparecem juntas na busca por este código.
+        </p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-100">
+                {["Marca", "Código do Fabricante", "Preço Unit. (R$)", "Estoque", ""].map((h) => (
+                  <th key={h} className="p-2 font-semibold text-slate-500 text-left">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {form.variacoes.map((v, idx) => (
+                <tr key={idx}>
+                  <td className="p-2">
+                    <input value={v.marca} onChange={(e) => setVariacao(idx, "marca", e.target.value)} placeholder="Ex: WEGA"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-xs focus:outline-none focus:border-[#EA6C0A]" />
+                  </td>
+                  <td className="p-2">
+                    <input value={v.codigo_fabricante ?? ""} onChange={(e) => setVariacao(idx, "codigo_fabricante", e.target.value)} placeholder="Ex: FCD4000"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-xs font-mono focus:outline-none focus:border-[#EA6C0A]" />
+                  </td>
+                  <td className="p-2">
+                    <input type="number" min={0} step="0.01" value={v.preco} onChange={(e) => setVariacao(idx, "preco", Number(e.target.value))}
+                      className="w-28 bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-xs text-right font-mono focus:outline-none focus:border-[#EA6C0A]" />
+                  </td>
+                  <td className="p-2">
+                    <input type="number" min={0} value={v.estoque} onChange={(e) => setVariacao(idx, "estoque", Number(e.target.value))}
+                      className="w-24 bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-xs text-center font-mono focus:outline-none focus:border-[#EA6C0A]" />
+                  </td>
+                  <td className="p-2">
+                    {form.variacoes.length > 1 && (
+                      <button type="button" onClick={() => removeVariacao(idx)} className="text-rose-400 hover:text-rose-600 transition-colors">
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div className="flex justify-end gap-3">
         <button type="button" onClick={onCancel}
           className="px-5 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors">
@@ -167,18 +221,27 @@ export default function Produtos() {
         const matchBusca = !q ||
           norm(p.codigo_produto).includes(q) ||
           norm(p.nome).includes(q) ||
-          norm(p.categoria).includes(q);
+          norm(p.categoria).includes(q) ||
+          p.variacoes?.some((v) => norm(v.marca).includes(q) || norm(v.codigo_fabricante ?? "").includes(q));
         const matchCat = !filtroCategoria || p.categoria === filtroCategoria;
         return matchBusca && matchCat;
       });
   }, [produtos, busca, filtroCategoria]);
+
+  const validarVariacoes = (variacoes: ProdutoVariacao[]) => {
+    if (variacoes.length === 0) return "Cadastre ao menos uma marca/variação.";
+    if (variacoes.some((v) => !v.marca.trim() && !v.codigo_fabricante?.trim())) return "Informe ao menos a marca ou o código do fabricante em cada linha.";
+    if (variacoes.some((v) => v.preco < 0 || v.estoque < 0)) return "Preço e estoque não podem ser negativos.";
+    return null;
+  };
 
   const handleCriar = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.codigo_produto.trim()) { toast.error("Campo obrigatório: Código do Produto."); return; }
     if (!form.nome.trim())           { toast.error("Campo obrigatório: Nome."); return; }
     if (!form.categoria)             { toast.error("Campo obrigatório: Categoria."); return; }
-    if (form.preco < 0)              { toast.error("Preço não pode ser negativo."); return; }
+    const erroVariacoes = validarVariacoes(form.variacoes);
+    if (erroVariacoes) { toast.error(erroVariacoes); return; }
     const existe = produtos.find((p) => p.codigo_produto === form.codigo_produto.trim());
     if (existe) { toast.error("Já existe um produto com este código. Use a aba Editar Produto para modificá-lo."); return; }
     setSalvando(true);
@@ -200,14 +263,13 @@ export default function Produtos() {
       nome: p.nome,
       categoria: p.categoria ?? "",
       unid: p.unid ?? "UNID",
-      preco: p.preco ?? 0,
-      estoque: p.estoque ?? 0,
       estoque_min: p.estoque_min ?? 0,
       estoque_max: p.estoque_max ?? 0,
       armario: p.armario ?? "",
       prateleira: p.prateleira ?? "",
       dias_validade_epi: p.dias_validade_epi ?? 0,
       status: p.status ?? "ATIVO",
+      variacoes: p.variacoes?.length ? p.variacoes.map((v) => ({ ...v })) : [variacaoVazia()],
     });
     setAba("editar");
   };
@@ -216,7 +278,8 @@ export default function Produtos() {
     e.preventDefault();
     if (!editForm.nome.trim()) { toast.error("Campo obrigatório: Nome."); return; }
     if (!editForm.categoria)   { toast.error("Campo obrigatório: Categoria."); return; }
-    if (editForm.preco < 0)    { toast.error("Preço não pode ser negativo."); return; }
+    const erroVariacoes = validarVariacoes(editForm.variacoes);
+    if (erroVariacoes) { toast.error(erroVariacoes); return; }
     setSalvandoEdit(true);
     try {
       await api.produtos.update(editId, editForm);
@@ -231,7 +294,7 @@ export default function Produtos() {
   const handleInativar = async (p: Product) => {
     if (!window.confirm(`Inativar "${p.nome}"?\nO produto não aparecerá mais nas buscas.`)) return;
     try {
-      await api.produtos.update(p.codigo_produto, { ...p, status: "INATIVO" });
+      await api.produtos.update(p.codigo_produto, { status: "INATIVO" });
       toast.success(`"${p.nome}" inativado com sucesso.`);
       await carregar();
     } catch {
@@ -241,17 +304,17 @@ export default function Produtos() {
 
   const ativosCount = produtos.filter((p) => p.status !== "INATIVO").length;
   const categoriasCount = new Set(produtos.filter((p) => p.status !== "INATIVO").map((p) => p.categoria)).size;
-  const criticos = produtos.filter((p) => p.status !== "INATIVO" && p.estoque_min > 0 && p.estoque <= p.estoque_min);
+  const criticos = produtos.filter((p) => p.status !== "INATIVO" && p.estoque_min > 0 && (p.estoque_total ?? 0) <= p.estoque_min);
   const valorEstoque = produtos
     .filter((p) => p.status !== "INATIVO")
-    .reduce((acc, p) => acc + (p.preco || 0) * (p.estoque || 0), 0);
+    .reduce((acc, p) => acc + (p.valor_total ?? 0), 0);
 
   const tabLabels: Record<Aba, string> = { lista: "📋 Lista", novo: "➕ Novo Produto", editar: "✏️ Editar Produto" };
 
   return (
     <>
       <div className="space-y-6">
-        <PageHeader title="Fichas de Produtos ✓" subtitle="Cadastro e manutenção do catálogo de produtos." />
+        <PageHeader title="Fichas de Produtos" subtitle="Cadastro e manutenção do catálogo de produtos." />
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
@@ -285,7 +348,7 @@ export default function Produtos() {
               <div className="relative flex-1">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input value={busca} onChange={(e) => setBusca(e.target.value)}
-                  placeholder="Buscar por código, nome ou categoria..."
+                  placeholder="Buscar por código, nome, categoria ou marca..."
                   className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#EA6C0A]" />
               </div>
               <select value={filtroCategoria} onChange={(e) => setFiltroCategoria(e.target.value)}
@@ -312,16 +375,18 @@ export default function Produtos() {
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-100">
-                      {["Código", "Nome", "Categoria", "Unid.", "Preço", "Estoque", "Mínimo", "Local", "Ações"].map((h) => (
+                      {["Código", "Nome", "Categoria", "Unid.", "Marcas / Preço", "Estoque Total", "Mínimo", "Local", "Ações"].map((h) => (
                         <th key={h} className="p-3 font-semibold text-slate-500 text-left whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     {produtosVisiveis.map((p) => {
-                      const critico = p.estoque_min > 0 && p.estoque <= p.estoque_min;
+                      const estoqueTotal = p.estoque_total ?? 0;
+                      const critico = p.estoque_min > 0 && estoqueTotal <= p.estoque_min;
+                      const marcas = p.variacoes ?? [];
                       return (
-                        <tr key={p.codigo_produto} className="hover:bg-slate-50 transition-colors">
+                        <tr key={p.codigo_produto} className="hover:bg-slate-50 transition-colors align-top">
                           <td className="p-3 font-mono text-[11px] text-slate-600">{p.codigo_produto}</td>
                           <td className="p-3 font-medium text-slate-800 max-w-[200px] truncate">{p.nome}</td>
                           <td className="p-3">
@@ -330,10 +395,21 @@ export default function Produtos() {
                             </span>
                           </td>
                           <td className="p-3 text-slate-500">{p.unid}</td>
-                          <td className="p-3 font-mono text-slate-600 whitespace-nowrap">{formatCurrency(p.preco)}</td>
+                          <td className="p-3">
+                            <div className="space-y-1">
+                              {marcas.map((v, i) => (
+                                <div key={v.id ?? i} className="flex items-center gap-2 whitespace-nowrap">
+                                  <span className="font-semibold text-slate-700">{v.marca || "—"}</span>
+                                  {v.codigo_fabricante && <span className="text-slate-400 font-mono text-[10px]">({v.codigo_fabricante})</span>}
+                                  <span className="font-mono text-slate-500">{formatCurrency(v.preco)}</span>
+                                  <span className="text-slate-400">· {v.estoque} {p.unid.toLowerCase()}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </td>
                           <td className="p-3 font-mono">
                             <span className={critico ? "text-rose-600 font-bold" : "text-slate-700"}>
-                              {p.estoque}{critico && " ⚠️"}
+                              {estoqueTotal}{critico && " ⚠️"}
                             </span>
                           </td>
                           <td className="p-3 font-mono text-slate-500">{p.estoque_min}</td>

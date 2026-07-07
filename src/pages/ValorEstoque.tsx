@@ -26,16 +26,16 @@ export default function ValorEstoque() {
   ).map(([categoria, ps]) => ({
     categoria,
     produtos: ps,
-    subtotal: ps.reduce((s, p) => s + p.estoque * p.preco, 0),
+    subtotal: ps.reduce((s, p) => s + (p.valor_total ?? 0), 0),
   })).sort((a, b) => a.categoria.localeCompare(b.categoria));
 
   const totalGeral = grupos.reduce((s, g) => s + g.subtotal, 0);
 
   const exportarCSV = () => {
-    const rows = [["Código", "Nome", "Categoria", "Estoque", "Preço Unit.", "Valor Total"]];
+    const rows = [["Código", "Nome", "Categoria", "Estoque", "Preço Unit. (mín-máx)", "Valor Total"]];
     produtos.forEach((p) => rows.push([
       p.codigo_produto, p.nome, p.categoria,
-      String(p.estoque), String(p.preco), String((p.estoque * p.preco).toFixed(2)),
+      String(p.estoque_total ?? 0), `${p.preco_min ?? 0}-${p.preco_max ?? 0}`, String((p.valor_total ?? 0).toFixed(2)),
     ]));
     rows.push(["", "", "", "", "TOTAL GERAL", totalGeral.toFixed(2)]);
     const csv = rows.map((r) => r.map((c) => `"${c}"`).join(";")).join("\n");
@@ -80,16 +80,21 @@ export default function ValorEstoque() {
                   ))}
                 </tr></thead>
                 <tbody className="divide-y divide-slate-50">
-                  {g.produtos.map((p) => (
-                    <tr key={p.id} className={`hover:bg-slate-50 transition-colors ${p.estoque <= p.estoque_min && p.estoque_min > 0 ? "bg-rose-50/40" : ""}`}>
-                      <td className="p-3 font-mono text-slate-500">{p.codigo_produto}</td>
-                      <td className="p-3 font-medium text-slate-800">{p.nome}</td>
-                      <td className="p-3 font-mono text-center font-bold text-slate-700">{p.estoque}</td>
-                      <td className="p-3 font-mono text-slate-500">{p.unid}</td>
-                      <td className="p-3 font-mono">{formatCurrency(p.preco)}</td>
-                      <td className="p-3 font-mono font-bold text-slate-700">{formatCurrency(p.estoque * p.preco)}</td>
-                    </tr>
-                  ))}
+                  {g.produtos.map((p) => {
+                    const estoqueTotal = p.estoque_total ?? 0;
+                    return (
+                      <tr key={p.id} className={`hover:bg-slate-50 transition-colors ${estoqueTotal <= p.estoque_min && p.estoque_min > 0 ? "bg-rose-50/40" : ""}`}>
+                        <td className="p-3 font-mono text-slate-500">{p.codigo_produto}</td>
+                        <td className="p-3 font-medium text-slate-800">{p.nome}</td>
+                        <td className="p-3 font-mono text-center font-bold text-slate-700">{estoqueTotal}</td>
+                        <td className="p-3 font-mono text-slate-500">{p.unid}</td>
+                        <td className="p-3 font-mono">
+                          {(p.preco_min ?? 0) === (p.preco_max ?? 0) ? formatCurrency(p.preco_min ?? 0) : `${formatCurrency(p.preco_min ?? 0)} – ${formatCurrency(p.preco_max ?? 0)}`}
+                        </td>
+                        <td className="p-3 font-mono font-bold text-slate-700">{formatCurrency(p.valor_total ?? 0)}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

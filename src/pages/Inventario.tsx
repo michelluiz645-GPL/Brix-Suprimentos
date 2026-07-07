@@ -41,18 +41,26 @@ export default function Inventario() {
 
   const handleFinalizar = async () => {
     if (!justificativa.trim()) { toast.error("Justificativa é obrigatória para confirmar ajustes."); return; }
-    const comDivergencia = produtos.filter((p) => p.contagem !== undefined && p.contagem !== p.estoque);
+    const comDivergencia = produtos.filter((p) => p.contagem !== undefined && p.contagem !== (p.estoque_total ?? 0));
     if (comDivergencia.length === 0) { toast.warning("Nenhuma divergência detectada para ajuste."); return; }
     setSalvando(true);
     try {
       for (const p of comDivergencia) {
         if (p.id !== undefined && p.contagem !== undefined) {
+          const estoqueAtual = p.estoque_total ?? 0;
           await api.movimentos.create({
             tipo: "AJUSTE", codigo: p.codigo_produto, nome: p.nome, unid: p.unid,
-            qtd: p.contagem - p.estoque, preco: p.preco, almoxarifado,
+            qtd: p.contagem - estoqueAtual, preco: p.preco_min ?? 0, almoxarifado,
             responsavel, data, obs: `Inventário — ${justificativa}`, usuario: responsavel,
           });
-          await api.produtos.update(String(p.id), { ...p, estoque: p.contagem });
+          // TODO: contagem física por marca/variação — por ora, o ajuste recai
+          // inteiro sobre a variação de maior estoque, como aproximação.
+          const variacoes = [...(p.variacoes ?? [])].sort((a, b) => b.estoque - a.estoque);
+          if (variacoes.length > 0) {
+            const diferenca = p.contagem - estoqueAtual;
+            variacoes[0] = { ...variacoes[0], estoque: Math.max(0, variacoes[0].estoque + diferenca) };
+            await api.produtos.update(String(p.id), { variacoes });
+          }
         }
       }
       toast.success(`Inventário finalizado! ${comDivergencia.length} ajuste(s) aplicado(s).`);
@@ -71,7 +79,7 @@ export default function Inventario() {
 
   const categorias = [...new Set(produtos.map((p) => p.categoria))].sort();
   const filtered = filtroCategoria ? produtos.filter((p) => p.categoria === filtroCategoria) : produtos;
-  const comDivergencia = produtos.filter((p) => p.contagem !== undefined && p.contagem !== p.estoque);
+  const comDivergencia = produtos.filter((p) => p.contagem !== undefined && p.contagem !== (p.estoque_total ?? 0));
 
   return (
     <>
@@ -134,7 +142,8 @@ export default function Inventario() {
                   </tr></thead>
                   <tbody className="divide-y divide-slate-50">
                     {filtered.map((p) => {
-                      const dif = p.contagem !== undefined ? p.contagem - p.estoque : null;
+                      const estoqueTotal = p.estoque_total ?? 0;
+                      const dif = p.contagem !== undefined ? p.contagem - estoqueTotal : null;
                       const diverge = dif !== null && dif !== 0;
                       return (
                         <tr key={p.id} className={`transition-colors ${diverge ? "bg-amber-50/40" : "hover:bg-slate-50"}`}>
@@ -142,7 +151,7 @@ export default function Inventario() {
                           <td className="p-3 font-medium text-slate-800">{p.nome}</td>
                           <td className="p-3 text-slate-500">{p.categoria}</td>
                           <td className="p-3 font-mono text-slate-400">{p.unid}</td>
-                          <td className="p-3 font-mono text-center font-bold text-slate-700">{p.estoque}</td>
+                          <td className="p-3 font-mono text-center font-bold text-slate-700">{estoqueTotal}</td>
                           <td className="p-3">
                             <input type="number" min={0} placeholder="—"
                               value={p.contagem !== undefined ? p.contagem : ""}

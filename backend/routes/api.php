@@ -3,8 +3,10 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ModuloController;
 use App\Http\Controllers\Api\PedidoOrcamentoController;
+use App\Http\Controllers\Api\ProdutoController;
 use App\Http\Controllers\Api\SolicitacaoCompraController;
 use App\Http\Controllers\Api\UsuarioController;
+use App\Http\Controllers\Api\VeiculoController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login']);
@@ -15,6 +17,18 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // RN-002.1 — módulos disponíveis por setor (usado na tela de permissões)
     Route::get('/modulos', [ModuloController::class, 'index']);
+
+    // RF-011 — Fichas de Produtos (leitura livre; escrita só Admin, checado no controller)
+    Route::get('/produtos',                [ProdutoController::class, 'index']);
+    Route::get('/produtos/{identificador}', [ProdutoController::class, 'show']);
+    Route::post('/produtos',               [ProdutoController::class, 'store']);
+    Route::put('/produtos/{identificador}', [ProdutoController::class, 'update']);
+    Route::delete('/produtos/{identificador}', [ProdutoController::class, 'destroy']);
+
+    // RF-016 — Frotas de Veículos
+    Route::get('/veiculos',            [VeiculoController::class, 'index']);
+    Route::post('/veiculos',           [VeiculoController::class, 'store']);
+    Route::put('/veiculos/{veiculo}',  [VeiculoController::class, 'update']);
 
     // RF-027 — Administração de Usuários
     Route::get('/usuarios',                   [UsuarioController::class, 'index']);

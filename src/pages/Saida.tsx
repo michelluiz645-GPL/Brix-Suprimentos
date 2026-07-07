@@ -30,7 +30,8 @@ export default function Saida() {
 
   const selectProduct = (idx: number, codigo: string) => {
     const p = products.find((p) => p.codigo_produto === codigo);
-    setItens((prev) => prev.map((it, i) => i === idx ? { ...it, codigo: p?.codigo_produto ?? codigo, nome: p?.nome ?? "", unid: p?.unid ?? "", preco: p?.preco ?? 0, estoque_disponivel: p?.estoque } : it));
+    // TODO: quando Saída passar a escolher a marca/variação específica, usar o preço/estoque dela em vez do agregado do produto
+    setItens((prev) => prev.map((it, i) => i === idx ? { ...it, codigo: p?.codigo_produto ?? codigo, nome: p?.nome ?? "", unid: p?.unid ?? "", preco: p?.preco_min ?? 0, estoque_disponivel: p?.estoque_total } : it));
   };
 
   const updateItem = (idx: number, field: keyof SaidaItem, value: string | number) =>
