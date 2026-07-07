@@ -22,6 +22,7 @@ class PedidoOrcamento extends Model
         'data_aprovacao_compra', 'aprovado_compra_por_id',
         'data_compra', 'comprado_por_id', 'data_prevista_recebimento',
         'data_recebimento', 'recebido_por_id',
+        'data_retirada', 'retirado_por_id',
         'motivo_rejeicao', 'timeline',
     ];
 
@@ -38,6 +39,7 @@ class PedidoOrcamento extends Model
         'data_aprovacao_compra' => 'datetime',
         'data_compra' => 'datetime',
         'data_recebimento' => 'datetime',
+        'data_retirada' => 'datetime',
     ];
 
     public function solicitante(): BelongsTo
@@ -68,5 +70,10 @@ class PedidoOrcamento extends Model
     public function recebidoPor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'recebido_por_id');
+    }
+
+    public function retiradoPor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'retirado_por_id');
     }
 }

@@ -87,6 +87,7 @@ export const api = {
     aprovarCompra:             (id: number)               => request<object>(`/pedidos-orcamento/${id}/aprovar-compra`, { method: "POST" }),
     registrarCompra:           (id: number, data: object) => request<object>(`/pedidos-orcamento/${id}/registrar-compra`, { method: "POST", body: JSON.stringify(data) }),
     confirmarRecebimento:      (id: number)               => request<object>(`/pedidos-orcamento/${id}/confirmar-recebimento`, { method: "POST" }),
+    confirmarRetirada:         (id: number)               => request<object>(`/pedidos-orcamento/${id}/confirmar-retirada`, { method: "POST" }),
   },
 
   funcionarios: {

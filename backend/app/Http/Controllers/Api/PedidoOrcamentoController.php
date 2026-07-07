@@ -20,7 +20,7 @@ class PedidoOrcamentoController extends Controller
     public function index(): JsonResponse
     {
         $pedidos = PedidoOrcamento::with([
-            'solicitante', 'cotadoPor', 'aprovadoManutencaoPor', 'aprovadoCompraPor', 'compradoPor', 'recebidoPor',
+            'solicitante', 'cotadoPor', 'aprovadoManutencaoPor', 'aprovadoCompraPor', 'compradoPor', 'recebidoPor', 'retiradoPor',
         ])->orderByDesc('created_at')->get()->map(fn ($p) => $this->serialize($p));
 
         return response()->json(['data' => $pedidos, 'message' => 'OK']);
@@ -135,6 +135,17 @@ class PedidoOrcamentoController extends Controller
         return response()->json(['data' => $this->serialize($pedidoOrcamento->fresh()), 'message' => 'Recebimento confirmado.']);
     }
 
+    public function confirmarRetirada(Request $request, PedidoOrcamento $pedidoOrcamento): JsonResponse
+    {
+        try {
+            $this->service->confirmarRetirada($pedidoOrcamento, $request->user());
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['data' => null, 'message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['data' => $this->serialize($pedidoOrcamento->fresh()), 'message' => 'Retirada confirmada.']);
+    }
+
     private function garantirStatus(PedidoOrcamento $pedido, string $statusEsperado): ?JsonResponse
     {
         if ($pedido->status !== $statusEsperado) {
@@ -193,6 +204,9 @@ class PedidoOrcamentoController extends Controller
 
             'data_recebimento' => $p->data_recebimento?->format('d/m/Y H:i'),
             'recebido_por'     => $p->recebidoPor?->nome,
+
+            'data_retirada' => $p->data_retirada?->format('d/m/Y H:i'),
+            'retirado_por'  => $p->retiradoPor?->nome,
 
             'motivo_rejeicao' => $p->motivo_rejeicao,
         ];

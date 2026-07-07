@@ -57,6 +57,10 @@ Route::middleware('auth:sanctum')->group(function () {
         [PedidoOrcamentoController::class, 'confirmarRecebimento']
     )->middleware('papel:op_manutencao,admin_manutencao,almoxarife');
 
+    Route::post('/pedidos-orcamento/{pedidoOrcamento}/confirmar-retirada',
+        [PedidoOrcamentoController::class, 'confirmarRetirada']
+    )->middleware('papel:op_manutencao,admin_manutencao');
+
     // RF-021 — Solicitação de Compra (SC)
     Route::get('/sc',  [SolicitacaoCompraController::class, 'index']);
     Route::get('/sc/{sc}', [SolicitacaoCompraController::class, 'show']);

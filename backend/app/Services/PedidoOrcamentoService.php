@@ -229,7 +229,37 @@ class PedidoOrcamentoService
         ]);
 
         $this->avancarTimeline($pedido, $statusAnterior, $responsavel->nome);
+        $this->notificar(['op_manutencao', 'admin_manutencao'], "Pedido {$pedido->numero_sc} concluído — material pendente de retirada no Almoxarifado.");
         $this->notificarUsuario($pedido->solicitante_id, "Pedido {$pedido->numero_sc} concluído — material recebido.");
+    }
+
+    /**
+     * A retirada física por Manutenção é registrada à parte da conclusão da
+     * compra (que já aconteceu em confirmarRecebimento) — não é uma nova
+     * etapa do status principal, só um marcador de "já veio buscar".
+     *
+     * @throws \InvalidArgumentException se o pedido não estiver concluído ou já tiver sido retirado
+     */
+    public function confirmarRetirada(PedidoOrcamento $pedido, User $responsavel): void
+    {
+        if ($pedido->status !== 'CONCLUIDO') {
+            throw new \InvalidArgumentException('Este pedido ainda não está concluído.');
+        }
+        if ($pedido->retirado_por_id !== null) {
+            throw new \InvalidArgumentException('Este pedido já foi retirado.');
+        }
+
+        $pedido->update([
+            'data_retirada'   => now(),
+            'retirado_por_id' => $responsavel->id,
+        ]);
+
+        $timeline = $pedido->timeline;
+        $ultimo = count($timeline) - 1;
+        if ($ultimo >= 0) {
+            $timeline[$ultimo]['subtitulo'] = trim(($timeline[$ultimo]['subtitulo'] ?? '') . " — Retirado por: {$responsavel->nome}", ' —');
+            $pedido->update(['timeline' => $timeline]);
+        }
     }
 
     private function timelineInicial(User $solicitante): array

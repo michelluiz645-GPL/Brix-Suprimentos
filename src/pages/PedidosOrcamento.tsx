@@ -13,7 +13,7 @@ type Status      =
   | "PENDENTE" | "COTANDO" | "AGUARDANDO_APROVACAO_MANUTENCAO" | "AGUARDANDO_APROVACAO_COMPRA"
   | "APROVADO" | "EM_TRANSITO" | "CONCLUIDO" | "REJEITADO";
 type TipoDestino = "FROTA" | "OBRA" | "EQUIPAMENTO";
-type TipoAcao    = "aprovar_compra" | "rejeitar" | "comprar" | "receber" | null;
+type TipoAcao    = "aprovar_compra" | "rejeitar" | "comprar" | "receber" | "retirar" | null;
 
 interface Item { descricao: string; quantidade: number; unidade: string; }
 interface TimelineStep {
@@ -38,6 +38,8 @@ interface Pedido {
   comprado_por?: string | null;
   data_prevista_recebimento?: string | null;
   recebido_por?: string | null;
+  data_retirada?: string | null;
+  retirado_por?: string | null;
   motivo_rejeicao?: string | null;
 }
 interface Props {
@@ -84,6 +86,7 @@ const STATUS_DA_ABA: Record<string, Status[]> = {
   "Aprovar Compra":     ["AGUARDANDO_APROVACAO_COMPRA"],
   "Pendente de Compra": ["APROVADO"],
   "Em Trânsito":        ["EM_TRANSITO"],
+  "Pendente Retirada":  ["CONCLUIDO"],
   "Concluído":          ["CONCLUIDO"],
 };
 
@@ -116,6 +119,8 @@ export default function PedidosOrcamento({ user, setor }: Props) {
 
   // "Confirmar Recebimento" continua gated por papel/setor, como já era.
   const podeConfirmarRecebimento = papel === "op_manutencao" || papel === "admin_manutencao" || papel === "almoxarife" || papel === "admin_geral";
+  // "Confirmar Retirada" é feito por quem vai buscar o material (Manutenção) — não pelo Almoxarifado, que já concluiu sua parte no recebimento.
+  const podeConfirmarRetirada = papel === "op_manutencao" || papel === "admin_manutencao" || papel === "admin_geral";
 
   // Pendentes/Pendente de Compra/Em Trânsito/Concluído são um painel geral, somente
   // leitura, visível para qualquer um com acesso ao módulo — só as filas de
@@ -128,7 +133,7 @@ export default function PedidosOrcamento({ user, setor }: Props) {
     if (temResp("cotador"))                lista.push("Em Cotação");
     if (temResp("aprovador_manutencao"))    lista.push("Aprovar Orçamento");
     if (temResp("aprovador_suprimentos"))   lista.push("Aprovar Compra");
-    lista.push("Pendente de Compra", "Em Trânsito", "Concluído");
+    lista.push("Pendente de Compra", "Em Trânsito", "Pendente Retirada", "Concluído");
     return lista;
   }, [temResp]);
 
@@ -190,7 +195,9 @@ export default function PedidosOrcamento({ user, setor }: Props) {
       return apenasSolicitante ? pedidosVisiveis.filter(p => p.solicitante === user.nome) : pedidosVisiveis;
     }
     const statusFiltro = STATUS_DA_ABA[aba] ?? [];
-    return pedidosVisiveis.filter(p => statusFiltro.includes(p.status));
+    const base = pedidosVisiveis.filter(p => statusFiltro.includes(p.status));
+    // "Pendente Retirada" é um recorte de Concluído: só os que a Manutenção ainda não retirou
+    return aba === "Pendente Retirada" ? base.filter(p => !p.retirado_por) : base;
   }, [pedidosVisiveis, temResp, nivelAdmin, user.nome]);
 
   // Busca por frota/obra/equipamento (destino) ou nº da SC, e filtro por período
@@ -261,6 +268,8 @@ export default function PedidosOrcamento({ user, setor }: Props) {
       await executarAcao(() => api.pedidosOrcamento.registrarCompra(pedido.id, { data_prevista_recebimento: acaoValor, desconto_negociacao: desconto }));
     } else if (tipo === "receber") {
       await executarAcao(() => api.pedidosOrcamento.confirmarRecebimento(pedido.id));
+    } else if (tipo === "retirar") {
+      await executarAcao(() => api.pedidosOrcamento.confirmarRetirada(pedido.id));
     }
   };
 
@@ -336,6 +345,8 @@ export default function PedidosOrcamento({ user, setor }: Props) {
       acoes.push(btnModal("Registrar Compra", "comprar", "bg-indigo-600 hover:bg-indigo-700"));
     if (podeConfirmarRecebimento && p.status === "EM_TRANSITO")
       acoes.push(btnModal("Confirmar Recebimento", "receber", "bg-emerald-600 hover:bg-emerald-700"));
+    if (podeConfirmarRetirada && p.status === "CONCLUIDO" && !p.retirado_por)
+      acoes.push(btnModal("Confirmar Retirada", "retirar", "bg-blue-600 hover:bg-blue-700"));
 
     return acoes.length ? <div className="flex flex-wrap gap-2">{acoes}</div> : null;
   };
@@ -556,6 +567,7 @@ export default function PedidosOrcamento({ user, setor }: Props) {
           acaoModal?.tipo === "aprovar_compra"      ? "Aprovar Compra"        :
           acaoModal?.tipo === "rejeitar"            ? "Rejeitar Pedido"       :
           acaoModal?.tipo === "comprar"             ? "Registrar Compra"      :
+          acaoModal?.tipo === "retirar"              ? "Confirmar Retirada"    :
           "Confirmar Recebimento"
         }
         size="sm">
@@ -605,6 +617,10 @@ export default function PedidosOrcamento({ user, setor }: Props) {
               <p className="text-xs text-slate-500">Confirma o recebimento completo dos itens deste pedido?</p>
             )}
 
+            {acaoModal.tipo === "retirar" && (
+              <p className="text-xs text-slate-500">Confirma que a Manutenção já retirou o material deste pedido no Almoxarifado?</p>
+            )}
+
             <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
               <button onClick={() => { setAcaoModal(null); setAcaoValor(""); setAcaoDesconto(""); }}
                 className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200">Cancelar</button>
@@ -612,12 +628,14 @@ export default function PedidosOrcamento({ user, setor }: Props) {
                 className={`px-5 py-2 text-xs font-bold text-white rounded-lg transition-all hover:-translate-y-0.5 disabled:opacity-60 ${
                   acaoModal.tipo === "rejeitar" ? "bg-red-600 hover:bg-red-700" :
                   acaoModal.tipo === "aprovar_compra" || acaoModal.tipo === "receber" ? "bg-emerald-600 hover:bg-emerald-700" :
+                  acaoModal.tipo === "retirar" ? "bg-blue-600 hover:bg-blue-700" :
                   "bg-gradient-to-r from-[#C75B12] to-[#EA6C0A]"
                 }`}>
                 {salvando ? "Processando..." :
                   acaoModal.tipo === "aprovar_compra"      ? "Aprovar"               :
                   acaoModal.tipo === "rejeitar"             ? "Rejeitar"              :
                   acaoModal.tipo === "comprar"              ? "Confirmar Compra"      :
+                  acaoModal.tipo === "retirar"               ? "Confirmar Retirada"    :
                   "Confirmar Recebimento"}
               </button>
             </div>
@@ -701,6 +719,9 @@ export default function PedidosOrcamento({ user, setor }: Props) {
                 ...(drawer.desconto_negociacao ? [["Desconto por Negociação", fmtMoeda(drawer.desconto_negociacao)]] : []),
                 ...(drawer.desconto_negociacao ? [["Valor Final da Compra", fmtMoeda(drawer.valor_final ?? drawer.valor_total)]] : []),
                 ...(drawer.data_prevista_recebimento ? [["Previsão de Recebimento", fmtDate(drawer.data_prevista_recebimento)]] : []),
+                ...(drawer.retirado_por
+                  ? [["Retirado por", drawer.retirado_por]]
+                  : drawer.status === "CONCLUIDO" ? [["Retirada", "Pendente — Manutenção ainda não retirou"]] : []),
                 ...(drawer.motivo_rejeicao ? [["Motivo da Rejeição", drawer.motivo_rejeicao]] : []),
               ] as [string, string][]).map(([k, v]) => (
                 <div key={k} className="flex justify-between text-sm gap-4">

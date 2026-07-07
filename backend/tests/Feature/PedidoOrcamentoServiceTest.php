@@ -141,6 +141,33 @@ class PedidoOrcamentoServiceTest extends TestCase
         ]);
     }
 
+    public function test_confirmar_retirada_exige_pedido_concluido_e_nao_permite_duplicidade(): void
+    {
+        $pedido = $this->criarPedido();
+        $manutencao = $this->criarUsuario('op_manutencao', Setor::MANUTENCAO);
+        $almoxarife = $this->criarUsuario('almoxarife', Setor::ALMOXARIFADO);
+
+        try {
+            $this->service->confirmarRetirada($pedido, $manutencao);
+            $this->fail('Deveria ter lançado exceção: pedido ainda não está concluído.');
+        } catch (\InvalidArgumentException $e) {
+            $this->assertStringContainsString('não está concluído', $e->getMessage());
+        }
+
+        // Avança manualmente até CONCLUIDO (sem repetir toda a cotação/aprovação/compra aqui)
+        $pedido->update(['status' => 'CONCLUIDO', 'recebido_por_id' => $almoxarife->id, 'data_recebimento' => now()]);
+
+        $this->service->confirmarRetirada($pedido, $manutencao);
+        $pedido->refresh();
+
+        $this->assertNotNull($pedido->data_retirada);
+        $this->assertSame($manutencao->id, $pedido->retirado_por_id);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('já foi retirado');
+        $this->service->confirmarRetirada($pedido, $manutencao);
+    }
+
     private function criarUsuario(string $papel, string $codigoSetor): User
     {
         static $seq = 0;
