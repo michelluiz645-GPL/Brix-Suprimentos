@@ -35,4 +35,12 @@ return [
         ],
     ],
 
+    // RF-020 — Suprimentos KOBO. Nunca logar/expor o token em texto puro.
+    'kobo' => [
+        'base_url'    => env('KOBO_BASE_URL', 'https://kf.kobotoolbox.org/api/v2'),
+        'token'       => env('KOBO_TOKEN'),
+        'uid_suprim'  => env('KOBO_UID_SUPRIM'),
+        'uid_compras' => env('KOBO_UID_COMPRAS'),
+    ],
+
 ];
