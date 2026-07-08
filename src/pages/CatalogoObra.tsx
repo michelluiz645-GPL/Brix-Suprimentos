@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import api from "@/services/api";
 import PageHeader from "@/components/PageHeader";
 import { useToast } from "@/hooks/useToast";
 import ToastContainer from "@/components/Toast";
@@ -27,6 +28,7 @@ const emptyForm = (): Omit<Material, "id"> => ({
 export default function CatalogoObra() {
   const toast = useToast();
   const [materiais, setMateriais] = useState<Material[]>([]);
+  const [loading, setLoading] = useState(true);
   const [busca, setBusca] = useState("");
   const [filtroCateg, setFiltroCateg] = useState("");
   const [modal, setModal] = useState<"novo" | "editar" | "importar" | null>(null);
@@ -35,62 +37,70 @@ export default function CatalogoObra() {
   const [salvando, setSalvando] = useState(false);
   const [textoImport, setTextoImport] = useState("");
 
-  useEffect(() => {
-    const saved = localStorage.getItem("geplan_catalogo_obra");
-    if (saved) { try { setMateriais(JSON.parse(saved)); } catch { /**/ } }
-  }, []);
-
-  const salvarLocal = (lista: Material[]) => {
-    setMateriais(lista);
-    localStorage.setItem("geplan_catalogo_obra", JSON.stringify(lista));
+  const carregar = () => {
+    setLoading(true);
+    api.materiaisObra.list().then((r) => {
+      const d = (r as { data: Material[] }).data ?? [];
+      setMateriais(Array.isArray(d) ? d : Object.values(d));
+    }).catch(() => toast.error("Não foi possível carregar o catálogo de materiais."))
+      .finally(() => setLoading(false));
   };
+
+  useEffect(() => { carregar(); }, []);
 
   const setF = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm((p) => ({ ...p, [k]: e.target.value }));
 
-  const handleSalvar = (e: React.FormEvent) => {
+  const handleSalvar = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.codigo.trim()) { toast.error("Código é obrigatório."); return; }
     if (!form.nome.trim()) { toast.error("Nome é obrigatório."); return; }
-    if (modal === "novo" && materiais.some((m) => m.codigo === form.codigo.trim())) {
-      toast.error("Código já existe no catálogo."); return;
-    }
     setSalvando(true);
-    setTimeout(() => {
+    try {
       if (modal === "novo") {
-        const novo: Material = { ...form, id: Date.now(), codigo: form.codigo.trim().toUpperCase() };
-        salvarLocal([...materiais, novo]);
+        await api.materiaisObra.create(form);
         toast.success("Material cadastrado!");
       } else if (sel?.id) {
-        salvarLocal(materiais.map((m) => m.id === sel.id ? { ...form, id: sel.id } : m));
+        await api.materiaisObra.update(sel.id, form);
         toast.success("Material atualizado!");
       }
-      setModal(null); setForm(emptyForm()); setSel(null); setSalvando(false);
-    }, 300);
+      setModal(null); setForm(emptyForm()); setSel(null);
+      carregar();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível salvar o material.");
+    } finally { setSalvando(false); }
   };
 
-  const inativar = (id: number) => {
-    if (!confirm("Inativar este material?")) return;
-    salvarLocal(materiais.map((m) => m.id === id ? { ...m, status: "INATIVO" } : m));
-    toast.success("Material inativado.");
+  const inativar = async (m: Material) => {
+    if (!m.id || !confirm("Inativar este material?")) return;
+    try {
+      await api.materiaisObra.update(m.id, { status: "INATIVO" });
+      toast.success("Material inativado.");
+      carregar();
+    } catch {
+      toast.error("Não foi possível inativar o material.");
+    }
   };
 
-  const handleImportar = () => {
+  const handleImportar = async () => {
     const linhas = textoImport.trim().split("\n").filter((l) => l.trim());
-    let importados = 0;
-    const novos: Material[] = [];
+    const itens = [];
     for (const linha of linhas) {
       const partes = linha.split("|").map((p) => p.trim());
-      if (partes.length < 3) continue;
+      if (partes.length < 2) continue;
       const [codigo, nome, categoria, unidade = "UN", especificacao = ""] = partes;
       if (!codigo || !nome) continue;
-      if (materiais.some((m) => m.codigo === codigo.toUpperCase())) continue;
-      novos.push({ id: Date.now() + importados, codigo: codigo.toUpperCase(), nome, categoria: categoria || "Outros", unidade, especificacao, obs: "", status: "ATIVO" });
-      importados++;
+      itens.push({ codigo, nome, categoria: categoria || "Outros", unidade, especificacao });
     }
-    salvarLocal([...materiais, ...novos]);
-    toast.success(`${importados} material(ais) importado(s)!`);
-    setTextoImport(""); setModal(null);
+    if (itens.length === 0) { toast.error("Nenhuma linha válida encontrada."); return; }
+    try {
+      const res = await api.materiaisObra.importar(itens);
+      toast.success(`${res.importados} material(ais) importado(s)!`);
+      setTextoImport(""); setModal(null);
+      carregar();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível importar os materiais.");
+    }
   };
 
   const filtered = materiais.filter((m) => {
@@ -133,7 +143,9 @@ export default function CatalogoObra() {
         </div>
 
         <div className="bg-white border border-slate-100 rounded-xl shadow-sm overflow-hidden">
-          {filtered.length === 0 ? (
+          {loading ? (
+            <div className="p-10 text-center text-xs text-slate-400">Carregando catálogo...</div>
+          ) : filtered.length === 0 ? (
             <div className="p-10 text-center text-xs text-slate-400">Nenhum material encontrado. Cadastre ou importe materiais.</div>
           ) : (
             <table className="w-full text-xs">
@@ -158,7 +170,7 @@ export default function CatalogoObra() {
                         <button onClick={() => { setSel(m); setForm({ codigo: m.codigo, nome: m.nome, categoria: m.categoria, unidade: m.unidade, especificacao: m.especificacao, obs: m.obs, status: m.status }); setModal("editar"); }}
                           className="text-slate-400 hover:text-[#EA6C0A] transition-colors"><Edit2 size={13} /></button>
                         {m.status === "ATIVO" && m.id && (
-                          <button onClick={() => inativar(m.id!)} className="text-slate-400 hover:text-rose-500 transition-colors"><PowerOff size={13} /></button>
+                          <button onClick={() => inativar(m)} className="text-slate-400 hover:text-rose-500 transition-colors"><PowerOff size={13} /></button>
                         )}
                       </div>
                     </td>
@@ -182,7 +194,8 @@ export default function CatalogoObra() {
             <div className="p-6 grid grid-cols-2 gap-4">
               <div>
                 <label className={lbl}>Código *</label>
-                <input value={form.codigo} onChange={setF("codigo")} placeholder="Ex: CON-001" className={`${inp} font-mono uppercase`} />
+                <input value={form.codigo} onChange={setF("codigo")} placeholder="Ex: CON-001" disabled={modal === "editar"}
+                  className={`${inp} font-mono uppercase ${modal === "editar" ? "opacity-60 cursor-not-allowed" : ""}`} />
               </div>
               <div>
                 <label className={lbl}>Unidade</label>

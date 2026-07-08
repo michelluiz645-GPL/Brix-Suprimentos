@@ -56,8 +56,8 @@ export default function ReposicaoAutomatica() {
     setGerando(true);
     try {
       await api.pedidosCompra.create({
-        data: today(),
-        data_entrega: modal.data_entrega,
+        data_pedido: today(),
+        data_desejada: modal.data_entrega,
         origem: "AUTOMATICO",
         urgencia: urgencia(modal.produto),
         setor_origem: "ALMOXARIFADO",
@@ -65,11 +65,10 @@ export default function ReposicaoAutomatica() {
         itens: [{
           nome: modal.produto.nome,
           qtd: modal.qtd_sugerida,
-          unid: modal.produto.unid,
-          preco: modal.produto.preco_min ?? 0,
+          unidade: modal.produto.unid,
+          preco_unit: modal.produto.preco_min ?? 0,
           desconto: 0,
         }],
-        status: "PENDENTE",
       });
       toast.success("Pedido de reposição gerado com sucesso!");
       setModal(null);
