@@ -9,7 +9,9 @@ import { Plus, Edit2, Users } from "lucide-react";
 const inp = "w-full px-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#EA6C0A] transition-colors";
 const lbl = "text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1";
 
-const emptyForm = () => ({ nome: "", numero: "", responsavel: "", veiculo: "", tipo: "" });
+const TIPOS_OPERACAO = ["Manutenção", "Conservação", "Terraplanagem", "Roçada", "Outro"];
+
+const emptyForm = () => ({ nome: "", numero: "", responsavel: "", veiculo: "", tipo: TIPOS_OPERACAO[0] });
 
 export default function Equipes() {
   const toast = useToast();
@@ -41,7 +43,7 @@ export default function Equipes() {
 
   const abrirNovo = () => { setForm(emptyForm()); setSel(null); setModal("novo"); };
   const abrirEditar = (t: Team) => {
-    setForm({ nome: t.nome, numero: t.numero, responsavel: t.responsavel ?? "", veiculo: t.veiculo ?? "", tipo: t.tipo ?? "" });
+    setForm({ nome: t.nome, numero: t.numero, responsavel: t.responsavel ?? "", veiculo: t.veiculo ?? "", tipo: t.tipo ?? TIPOS_OPERACAO[0] });
     setSel(t); setModal("editar");
   };
 
@@ -49,6 +51,7 @@ export default function Equipes() {
     e.preventDefault();
     if (!form.nome.trim()) { toast.error("Nome da equipe é obrigatório."); return; }
     if (!form.numero.trim()) { toast.error("Número da equipe é obrigatório."); return; }
+    if (!form.tipo) { toast.error("Tipo de operação é obrigatório."); return; }
     setSalvando(true);
     try {
       if (modal === "novo") {
@@ -64,7 +67,7 @@ export default function Equipes() {
     } finally { setSalvando(false); }
   };
 
-  const setF = (k: keyof ReturnType<typeof emptyForm>) => (e: React.ChangeEvent<HTMLInputElement>) =>
+  const setF = (k: keyof ReturnType<typeof emptyForm>) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm((p) => ({ ...p, [k]: e.target.value }));
 
   return (
@@ -94,6 +97,9 @@ export default function Equipes() {
                     </div>
                     <button onClick={() => abrirEditar(eq)} className="text-slate-300 hover:text-[#EA6C0A] transition-colors"><Edit2 size={14} /></button>
                   </div>
+                  {eq.tipo && (
+                    <span className="inline-block mb-2 text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{eq.tipo}</span>
+                  )}
                   {eq.responsavel && <p className="text-xs text-slate-500 mb-1"><span className="font-bold">Responsável:</span> {eq.responsavel}</p>}
                   {eq.veiculo && <p className="text-xs text-slate-500 mb-3"><span className="font-bold">Veículo:</span> {eq.veiculo}</p>}
                   <div className="border-t border-slate-50 pt-3">
@@ -133,6 +139,12 @@ export default function Equipes() {
               <div>
                 <label className={lbl}>Número da Equipe *</label>
                 <input value={form.numero} onChange={setF("numero")} placeholder="Ex: 01" className={inp} />
+              </div>
+              <div>
+                <label className={lbl}>Tipo de Operação *</label>
+                <select value={form.tipo} onChange={setF("tipo")} className={inp}>
+                  {TIPOS_OPERACAO.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
               </div>
               <div>
                 <label className={lbl}>Responsável</label>
