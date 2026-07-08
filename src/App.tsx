@@ -123,7 +123,7 @@ function AppShell() {
       case "Consultar":          return <Consultar />;
       case "Entrada":            return <Entrada />;
       case "Saída":              return <Saida />;
-      case "Histórico Cupons":   return <HistoricoCupons />;
+      case "Histórico Cupons":   return <HistoricoCupons user={auth.user} />;
       case "Devolução":          return <Devolucao />;
       case "Entregas Pend.":     return <EntregasPendentes />;
       case "Combustíveis":       return <Combustiveis />;

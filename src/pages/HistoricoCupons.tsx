@@ -4,7 +4,7 @@ import PageHeader from "@/components/PageHeader";
 import { useToast } from "@/hooks/useToast";
 import ToastContainer from "@/components/Toast";
 import { formatCurrency, formatDate } from "@/utils/formatters";
-import { Eye, Printer } from "lucide-react";
+import { Eye, Printer, Ban } from "lucide-react";
 
 interface CupomItem { nome: string; unid: string; qtd: number; preco: number; obs?: string; }
 interface Cupom {
@@ -21,21 +21,41 @@ interface Cupom {
   status: string;
 }
 
-export default function HistoricoCupons() {
+interface Props {
+  user?: { nivel?: string };
+}
+
+export default function HistoricoCupons({ user }: Props) {
   const toast = useToast();
   const [cupons, setCupons] = useState<Cupom[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtroEquipe, setFiltroEquipe] = useState("");
   const [filtroData, setFiltroData] = useState("");
   const [cupomSel, setCupomSel] = useState<Cupom | null>(null);
+  const isAdmin = user?.nivel === "ADMIN";
 
-  useEffect(() => {
+  const carregar = () => {
+    setLoading(true);
     api.saidas.cupons().then((r) => {
       const d = (r as { data: Cupom[] }).data ?? [];
       setCupons(Array.isArray(d) ? d : Object.values(d));
     }).catch(() => toast.error("Não foi possível carregar os cupons."))
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { carregar(); }, []);
+
+  const cancelar = async (c: Cupom) => {
+    if (!window.confirm(`Cancelar o cupom ${c.numero_pedido}? O estoque dos itens será estornado.`)) return;
+    try {
+      await api.saidas.cancelar(c.numero_pedido);
+      toast.success("Cupom cancelado e estoque estornado.");
+      setCupomSel(null);
+      carregar();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível cancelar o cupom.");
+    }
+  };
 
   const filtered = cupons.filter((c) => {
     const equipeOk = !filtroEquipe || (c.nome_equipe || c.equipe || "").toLowerCase().includes(filtroEquipe.toLowerCase());
@@ -97,13 +117,13 @@ export default function HistoricoCupons() {
           ) : (
             <table className="w-full text-xs">
               <thead><tr className="bg-slate-50 border-b border-slate-100">
-                {["Pedido", "Data", "Equipe", "Almox.", "Itens", "Total", ""].map((h) => (
+                {["Pedido", "Data", "Equipe", "Almox.", "Itens", "Total", "Status", ""].map((h) => (
                   <th key={h} className="p-3 font-semibold text-slate-500 text-left">{h}</th>
                 ))}
               </tr></thead>
               <tbody className="divide-y divide-slate-50">
                 {filtered.map((c, i) => (
-                  <tr key={i} className="hover:bg-slate-50 transition-colors">
+                  <tr key={i} className={`hover:bg-slate-50 transition-colors ${c.status === "CANCELADO" ? "opacity-50" : ""}`}>
                     <td className="p-3 font-mono font-bold text-[#EA6C0A]">{c.numero_pedido}</td>
                     <td className="p-3 text-slate-600">{formatDate(c.data_saida)}</td>
                     <td className="p-3 font-medium">{c.nome_equipe || c.equipe}</td>
@@ -111,9 +131,17 @@ export default function HistoricoCupons() {
                     <td className="p-3 font-mono text-center">{totalItens(c)}</td>
                     <td className="p-3 font-mono font-bold text-slate-700">{formatCurrency(totalVal(c))}</td>
                     <td className="p-3">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${c.status === "CANCELADO" ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"}`}>
+                        {c.status === "CANCELADO" ? "Cancelado" : "Ativo"}
+                      </span>
+                    </td>
+                    <td className="p-3">
                       <div className="flex gap-2">
                         <button onClick={() => setCupomSel(c)} className="text-slate-400 hover:text-[#EA6C0A] transition-colors"><Eye size={15} /></button>
                         <button onClick={() => imprimir(c)} className="text-slate-400 hover:text-[#EA6C0A] transition-colors"><Printer size={15} /></button>
+                        {isAdmin && c.status !== "CANCELADO" && (
+                          <button onClick={() => cancelar(c)} title="Cancelar cupom" className="text-slate-400 hover:text-rose-500 transition-colors"><Ban size={15} /></button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -132,10 +160,18 @@ export default function HistoricoCupons() {
                 <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Cupom {cupomSel.numero_pedido}</h2>
                 <p className="text-xs text-slate-400 mt-0.5">{formatDate(cupomSel.data_saida)} — {cupomSel.nome_equipe || cupomSel.equipe}</p>
               </div>
-              <button onClick={() => imprimir(cupomSel)}
-                className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold bg-[#EA6C0A] text-white rounded-lg hover:bg-[#C75B12] transition-colors">
-                <Printer size={13} /> Imprimir
-              </button>
+              <div className="flex gap-2">
+                {isAdmin && cupomSel.status !== "CANCELADO" && (
+                  <button onClick={() => cancelar(cupomSel)}
+                    className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold bg-rose-100 text-rose-700 rounded-lg hover:bg-rose-200 transition-colors">
+                    <Ban size={13} /> Cancelar
+                  </button>
+                )}
+                <button onClick={() => imprimir(cupomSel)}
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold bg-[#EA6C0A] text-white rounded-lg hover:bg-[#C75B12] transition-colors">
+                  <Printer size={13} /> Imprimir
+                </button>
+              </div>
             </div>
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-3 text-xs">

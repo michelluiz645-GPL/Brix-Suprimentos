@@ -6,9 +6,9 @@ import ToastContainer from "@/components/Toast";
 import { today } from "@/utils/formatters";
 import { Search } from "lucide-react";
 
-interface CupomItem { nome: string; unid: string; qtd: number; preco: number; }
-interface Cupom { numero_pedido: string; equipe: string; nome_equipe: string; data_saida: string; almoxarifado: string; itens: CupomItem[]; }
-interface ItemDev { nome: string; unid: string; qtd_orig: number; qtd_dev: number; }
+interface CupomItem { codigo: string; variacao_id: number | null; nome: string; unid: string; qtd: number; preco: number; }
+interface Cupom { numero_pedido: string; equipe: string; nome_equipe: string; data_saida: string; almoxarifado: string; itens: CupomItem[]; status: string; }
+interface ItemDev { codigo: string; variacao_id: number | null; nome: string; unid: string; qtd_orig: number; qtd_dev: number; danificado: boolean; }
 
 const inp = "w-full px-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#EA6C0A] transition-colors";
 const lbl = "text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1";
@@ -38,8 +38,9 @@ export default function Devolucao() {
              (c.nome_equipe ?? "").toLowerCase().includes(busca.trim().toLowerCase())
     );
     if (!found) { toast.error("Pedido não encontrado."); setCupomSel(null); return; }
+    if (found.status === "CANCELADO") { toast.error("Este pedido de saída foi cancelado — não é possível devolver itens dele."); setCupomSel(null); return; }
     setCupomSel(found);
-    setItens(found.itens.map((it) => ({ nome: it.nome, unid: it.unid, qtd_orig: it.qtd, qtd_dev: it.qtd })));
+    setItens(found.itens.map((it) => ({ codigo: it.codigo, variacao_id: it.variacao_id, nome: it.nome, unid: it.unid, qtd_orig: it.qtd, qtd_dev: it.qtd, danificado: false })));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -90,7 +91,7 @@ export default function Devolucao() {
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead><tr className="bg-slate-50 border-b border-slate-100">
-                    {["Produto", "Unid.", "Qtd. Original", "Qtd. a Devolver"].map((h) => (
+                    {["Produto", "Unid.", "Qtd. Original", "Qtd. a Devolver", "Danificado"].map((h) => (
                       <th key={h} className="p-3 font-semibold text-slate-500 text-left">{h}</th>
                     ))}
                   </tr></thead>
@@ -104,6 +105,13 @@ export default function Devolucao() {
                           <input type="number" min={0} max={it.qtd_orig} value={it.qtd_dev}
                             onChange={(e) => setItens((prev) => prev.map((x, idx) => idx === i ? { ...x, qtd_dev: Number(e.target.value) } : x))}
                             className="w-20 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-center font-mono focus:outline-none focus:border-[#EA6C0A]" />
+                        </td>
+                        <td className="p-3">
+                          <label className="flex items-center gap-1.5 text-[11px] text-slate-500 cursor-pointer">
+                            <input type="checkbox" checked={it.danificado}
+                              onChange={(e) => setItens((prev) => prev.map((x, idx) => idx === i ? { ...x, danificado: e.target.checked } : x))} />
+                            Não retorna ao estoque
+                          </label>
                         </td>
                       </tr>
                     ))}

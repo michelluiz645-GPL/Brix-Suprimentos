@@ -7,18 +7,21 @@ import { formatCurrency, today } from "@/utils/formatters";
 import type { Product } from "@/types";
 import { Plus, Trash2 } from "lucide-react";
 
-interface SaidaItem { codigo: string; nome: string; unid: string; qtd: number; preco: number; obs?: string; estoque_disponivel?: number; }
+interface SaidaItem { codigo: string; variacao_id: number | null; nome: string; unid: string; qtd: number; preco: number; obs?: string; estoque_disponivel?: number; }
+
+const TIPOS_SAIDA = ["Retirada", "Entrega"];
 
 export default function Saida() {
   const toast = useToast();
   const [products, setProducts] = useState<Product[]>([]);
+  const [tipoSaida, setTipoSaida] = useState(TIPOS_SAIDA[0]);
   const [equipe, setEquipe]     = useState("");
   const [colaborador, setColab] = useState("");
   const [entregador, setEntreg] = useState("");
   const [respAlmox, setResp]    = useState("");
   const [almox, setAlmox]       = useState("");
   const [data, setData]         = useState(today());
-  const [itens, setItens]       = useState<SaidaItem[]>([{ codigo: "", nome: "", unid: "", qtd: 1, preco: 0 }]);
+  const [itens, setItens]       = useState<SaidaItem[]>([{ codigo: "", variacao_id: null, nome: "", unid: "", qtd: 1, preco: 0 }]);
   const [loading, setLoading]   = useState(false);
 
   useEffect(() => {
@@ -28,15 +31,39 @@ export default function Saida() {
     });
   }, []);
 
+  const nomeComMarca = (prod: Product, variacaoId: number) => {
+    const v = prod.variacoes.find((x) => x.id === variacaoId);
+    if (!v) return prod.nome;
+    const sufixo = [v.marca, v.codigo_fabricante && `(${v.codigo_fabricante})`].filter(Boolean).join(" ");
+    return sufixo ? `${prod.nome} — ${sufixo}` : prod.nome;
+  };
+
   const selectProduct = (idx: number, codigo: string) => {
     const p = products.find((p) => p.codigo_produto === codigo);
-    // TODO: quando Saída passar a escolher a marca/variação específica, usar o preço/estoque dela em vez do agregado do produto
-    setItens((prev) => prev.map((it, i) => i === idx ? { ...it, codigo: p?.codigo_produto ?? codigo, nome: p?.nome ?? "", unid: p?.unid ?? "", preco: p?.preco_min ?? 0, estoque_disponivel: p?.estoque_total } : it));
+    if (!p) {
+      setItens((prev) => prev.map((it, i) => i === idx ? { ...it, codigo: "", variacao_id: null, nome: "", unid: "", preco: 0, estoque_disponivel: undefined } : it));
+      return;
+    }
+    const variacoes = p.variacoes ?? [];
+    if (variacoes.length === 1) {
+      const v = variacoes[0];
+      setItens((prev) => prev.map((it, i) => i === idx ? { ...it, codigo: p.codigo_produto, variacao_id: v.id ?? null, nome: nomeComMarca(p, v.id ?? -1), unid: p.unid, preco: v.preco, estoque_disponivel: v.estoque } : it));
+    } else {
+      setItens((prev) => prev.map((it, i) => i === idx ? { ...it, codigo: p.codigo_produto, variacao_id: null, nome: p.nome, unid: p.unid, preco: 0, estoque_disponivel: undefined } : it));
+    }
+  };
+
+  const selectVariacao = (idx: number, variacaoId: string) => {
+    const item = itens[idx];
+    const p = products.find((p) => p.codigo_produto === item.codigo);
+    const v = p?.variacoes.find((x) => String(x.id) === variacaoId);
+    if (!p || !v) return;
+    setItens((prev) => prev.map((it, i) => i === idx ? { ...it, variacao_id: v.id ?? null, nome: nomeComMarca(p, v.id ?? -1), preco: v.preco, estoque_disponivel: v.estoque } : it));
   };
 
   const updateItem = (idx: number, field: keyof SaidaItem, value: string | number) =>
     setItens((p) => p.map((it, i) => i === idx ? { ...it, [field]: value } : it));
-  const addItem    = () => setItens((p) => [...p, { codigo: "", nome: "", unid: "", qtd: 1, preco: 0 }]);
+  const addItem    = () => setItens((p) => [...p, { codigo: "", variacao_id: null, nome: "", unid: "", qtd: 1, preco: 0 }]);
   const removeItem = (idx: number) => setItens((p) => p.filter((_, i) => i !== idx));
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -47,15 +74,16 @@ export default function Saida() {
     if (!almox.trim())      { toast.error("Campo obrigatório: Suprimentos."); return; }
     if (!data)              { toast.error("Campo obrigatório: Data."); return; }
     if (itens.some((i) => !i.codigo))   { toast.error("Todos os itens precisam ter um produto selecionado."); return; }
+    if (itens.some((i) => !i.variacao_id)) { toast.error("Selecione a marca de cada item — o produto tem mais de uma cadastrada."); return; }
     if (itens.some((i) => i.qtd <= 0))  { toast.error("Todos os itens precisam ter quantidade maior que zero."); return; }
     const over = itens.find((it) => it.estoque_disponivel !== undefined && it.qtd > it.estoque_disponivel);
     if (over) { toast.error(`"${over.nome}" — quantidade solicitada (${over.qtd}) maior que o estoque disponível (${over.estoque_disponivel}).`); return; }
     setLoading(true);
     try {
-      const res = await api.saidas.create({ tipo: "SAÍDA", equipe, colaborador, entregador, resp_almox: respAlmox, almoxarifado: almox, data, itens }) as { data: { numero_pedido: string } };
+      const res = await api.saidas.create({ tipo: "SAÍDA", tipo_saida: tipoSaida, equipe, colaborador, entregador, resp_almox: respAlmox, almoxarifado: almox, data, itens }) as { data: { numero_pedido: string } };
       toast.success(`Saída registrada! Cupom nº ${res.data?.numero_pedido ?? ""}`);
       setEquipe(""); setColab(""); setEntreg(""); setResp(""); setAlmox("");
-      setItens([{ codigo: "", nome: "", unid: "", qtd: 1, preco: 0 }]);
+      setItens([{ codigo: "", variacao_id: null, nome: "", unid: "", qtd: 1, preco: 0 }]);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Não foi possível registrar a saída. Tente novamente.");
     } finally { setLoading(false); }
@@ -69,6 +97,13 @@ export default function Saida() {
         <div className="bg-white border border-slate-100 rounded-xl p-5 shadow-sm">
           <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-4">Dados da Saída</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Tipo *</label>
+              <select value={tipoSaida} onChange={(e) => setTipoSaida(e.target.value)}
+                className="w-full px-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#EA6C0A]">
+                {TIPOS_SAIDA.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
             {[
               { label: "Equipe / Destinatário *", value: equipe, set: setEquipe, placeholder: "Ex: Equipe 01" },
               { label: "Colaborador", value: colaborador, set: setColab, placeholder: "Nome do colaborador" },
@@ -100,13 +135,15 @@ export default function Saida() {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead><tr className="bg-slate-50 border-b border-slate-100">
-                {["Produto", "Disponível", "Qtd", "Unid.", "Observação", ""].map((h) => (
+                {["Produto", "Marca", "Disponível", "Qtd", "Unid.", "Observação", ""].map((h) => (
                   <th key={h} className="p-3 font-semibold text-slate-500 text-left">{h}</th>
                 ))}
               </tr></thead>
               <tbody className="divide-y divide-slate-50">
                 {itens.map((item, idx) => {
                   const over = item.estoque_disponivel !== undefined && item.qtd > item.estoque_disponivel;
+                  const prod = products.find((p) => p.codigo_produto === item.codigo);
+                  const variacoes = prod?.variacoes ?? [];
                   return (
                     <tr key={idx}>
                       <td className="p-2">
@@ -115,6 +152,19 @@ export default function Saida() {
                           <option value="">— Selecione —</option>
                           {products.map((p) => <option key={p.codigo_produto} value={p.codigo_produto}>{p.codigo_produto} — {p.nome}</option>)}
                         </select>
+                      </td>
+                      <td className="p-2">
+                        {variacoes.length > 1 ? (
+                          <select value={item.variacao_id ?? ""} onChange={(e) => selectVariacao(idx, e.target.value)}
+                            className="w-36 bg-amber-50 border border-amber-300 rounded-lg px-2 py-2 text-xs focus:outline-none focus:border-[#EA6C0A]">
+                            <option value="">— Marca —</option>
+                            {variacoes.map((v) => (
+                              <option key={v.id} value={v.id}>{v.marca || "(sem marca)"}{v.codigo_fabricante ? ` (${v.codigo_fabricante})` : ""}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="text-slate-400 text-[11px]">{variacoes[0]?.marca || "—"}</span>
+                        )}
                       </td>
                       <td className="p-2 font-mono text-center text-slate-500">{item.estoque_disponivel ?? "—"}</td>
                       <td className="p-2">
