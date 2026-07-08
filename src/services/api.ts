@@ -60,6 +60,7 @@ export const api = {
   saidas: {
     create: (data: object)   => request<object>("/saidas", { method: "POST", body: JSON.stringify(data) }),
     cupons: (params?: string) => request<object>(`/saidas/cupons${params ? `?${params}` : ""}`),
+    cancelar: (numeroPedido: string) => request<object>(`/saidas/cupons/${numeroPedido}/cancelar`, { method: "POST" }),
   },
 
   devolucoes: {
@@ -114,6 +115,13 @@ export const api = {
     get: (id: number)        => request<object>(`/obras/${id}`),
     create: (data: object)   => request<object>("/obras", { method: "POST", body: JSON.stringify(data) }),
     update: (id: number, data: object) => request<object>(`/obras/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  },
+
+  materiaisObra: {
+    list: ()                 => request<object>("/materiais-obra"),
+    create: (data: object)   => request<object>("/materiais-obra", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: object) => request<object>(`/materiais-obra/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    importar: (itens: object[]) => request<{ importados: number }>("/materiais-obra/importar", { method: "POST", body: JSON.stringify({ itens }) }),
   },
 
   fornecedores: {
@@ -180,9 +188,9 @@ export const api = {
   },
 
   sistema: {
-    status: ()    => request<{ connected: boolean; message: string }>("/sistema/status"),
-    backup: ()    => request<object>("/sistema/backup"),
-    syncAll: ()   => request<object>("/sistema/sync", { method: "POST" }),
+    status: ()    => request<{ connected: boolean; message: string; kobo_configurado: boolean }>("/sistema/status"),
+    backup: ()    => request<{ arquivo: string; tamanho_kb: number; conteudo_base64: string }>("/sistema/backup"),
+    historico: () => request<object[]>("/sistema/historico"),
   },
 };
 

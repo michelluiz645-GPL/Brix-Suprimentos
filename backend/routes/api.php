@@ -1,9 +1,25 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CombustivelController;
+use App\Http\Controllers\Api\DebitoManutencaoController;
+use App\Http\Controllers\Api\DevolucaoController;
+use App\Http\Controllers\Api\EntregaController;
+use App\Http\Controllers\Api\EquipamentoController;
+use App\Http\Controllers\Api\EpiRegistroController;
+use App\Http\Controllers\Api\EquipeController;
+use App\Http\Controllers\Api\FornecedorController;
+use App\Http\Controllers\Api\FuncionarioController;
+use App\Http\Controllers\Api\KoboController;
+use App\Http\Controllers\Api\MaterialObraController;
 use App\Http\Controllers\Api\ModuloController;
+use App\Http\Controllers\Api\MovimentoController;
+use App\Http\Controllers\Api\ObraController;
+use App\Http\Controllers\Api\PedidoCompraController;
+use App\Http\Controllers\Api\SaidaController;
 use App\Http\Controllers\Api\PedidoOrcamentoController;
 use App\Http\Controllers\Api\ProdutoController;
+use App\Http\Controllers\Api\SistemaController;
 use App\Http\Controllers\Api\SolicitacaoCompraController;
 use App\Http\Controllers\Api\UsuarioController;
 use App\Http\Controllers\Api\VeiculoController;
@@ -29,6 +45,86 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/veiculos',            [VeiculoController::class, 'index']);
     Route::post('/veiculos',           [VeiculoController::class, 'store']);
     Route::put('/veiculos/{veiculo}',  [VeiculoController::class, 'update']);
+
+    // RF-014 — Funcionários
+    Route::get('/funcionarios',              [FuncionarioController::class, 'index']);
+    Route::get('/funcionarios/{funcionario}', [FuncionarioController::class, 'show']);
+    Route::post('/funcionarios',             [FuncionarioController::class, 'store']);
+    Route::put('/funcionarios/{funcionario}', [FuncionarioController::class, 'update']);
+
+    // RF-015 — Equipes de Campo
+    Route::get('/equipes',            [EquipeController::class, 'index']);
+    Route::post('/equipes',           [EquipeController::class, 'store']);
+    Route::put('/equipes/{equipe}',   [EquipeController::class, 'update']);
+
+    // RF-018 — Fornecedores (leitura livre; escrita só Admin da Engenharia, checado no controller)
+    Route::get('/fornecedores',              [FornecedorController::class, 'index']);
+    Route::post('/fornecedores',             [FornecedorController::class, 'store']);
+    Route::put('/fornecedores/{fornecedor}', [FornecedorController::class, 'update']);
+
+    // RF-005 — Registrar Entrada (e ledger geral de movimentações)
+    Route::get('/movimentos',  [MovimentoController::class, 'index']);
+    Route::post('/movimentos', [MovimentoController::class, 'store']);
+
+    // RF-006, RF-007 — Registrar Saída / Histórico de Cupons
+    Route::get('/saidas/cupons',                       [SaidaController::class, 'cupons']);
+    Route::post('/saidas',                             [SaidaController::class, 'store']);
+    Route::post('/saidas/cupons/{numeroPedido}/cancelar', [SaidaController::class, 'cancelar']);
+
+    // RF-008 — Devolução
+    Route::post('/devolucoes', [DevolucaoController::class, 'store']);
+
+    // RF-009 — Entregas Pendentes
+    Route::get('/entregas',                  [EntregaController::class, 'index']);
+    Route::post('/entregas/{id}/confirmar',  [EntregaController::class, 'confirmar']);
+
+    // RF-010 — Combustíveis
+    Route::get('/combustiveis/saldo', [CombustivelController::class, 'saldo']);
+    Route::get('/combustiveis',       [CombustivelController::class, 'index']);
+    Route::post('/combustiveis',      [CombustivelController::class, 'store']);
+
+    // RF-024 — Equipamentos Pesados
+    Route::get('/equipamentos',                [EquipamentoController::class, 'index']);
+    Route::post('/equipamentos',               [EquipamentoController::class, 'store']);
+    Route::put('/equipamentos/{equipamento}',  [EquipamentoController::class, 'update']);
+
+    // RF-017 — Obras & Projetos
+    Route::get('/obras',          [ObraController::class, 'index']);
+    Route::get('/obras/{obra}',   [ObraController::class, 'show']);
+    Route::post('/obras',         [ObraController::class, 'store']);
+    Route::put('/obras/{obra}',   [ObraController::class, 'update']);
+
+    // RF-022 — Pedido de Compra
+    Route::get('/pedidos-compra',                    [PedidoCompraController::class, 'index']);
+    Route::get('/pedidos-compra/{pedidoCompra}',      [PedidoCompraController::class, 'show']);
+    Route::post('/pedidos-compra',                    [PedidoCompraController::class, 'store']);
+    Route::put('/pedidos-compra/{pedidoCompra}',       [PedidoCompraController::class, 'update']);
+    Route::patch('/pedidos-compra/{pedidoCompra}/status', [PedidoCompraController::class, 'updateStatus']);
+
+    // RF-025 — Débitos de Manutenção
+    Route::get('/debitos',              [DebitoManutencaoController::class, 'index']);
+    Route::post('/debitos',             [DebitoManutencaoController::class, 'store']);
+    Route::patch('/debitos/{debito}/pagar', [DebitoManutencaoController::class, 'pagar']);
+
+    // RF-023 — Segurança & EPI
+    Route::get('/epi',          [EpiRegistroController::class, 'index']);
+    Route::post('/epi',         [EpiRegistroController::class, 'store']);
+    Route::put('/epi/{epi}',    [EpiRegistroController::class, 'update']);
+
+    // RF-020 — Suprimentos KOBO
+    Route::get('/kobo/suprimentos', [KoboController::class, 'suprimentos']);
+    Route::get('/kobo/compras',     [KoboController::class, 'compras']);
+
+    // RF-026 — Segurança de Dados (Admin do Almoxarifado ou da Engenharia, checado no controller)
+    Route::get('/sistema/status',    [SistemaController::class, 'status']);
+    Route::get('/sistema/historico', [SistemaController::class, 'historico']);
+    Route::get('/sistema/backup',    [SistemaController::class, 'backup']);
+
+    // RF-028 — Catálogo de Materiais de Obra
+    Route::get('/materiais-obra',                   [MaterialObraController::class, 'index']);
+    Route::post('/materiais-obra',                   [MaterialObraController::class, 'store']);
+    Route::post('/materiais-obra/importar',          [MaterialObraController::class, 'importar']);
+    Route::put('/materiais-obra/{materiaisObra}',    [MaterialObraController::class, 'update']);
 
     // RF-027 — Administração de Usuários
     Route::get('/usuarios',                   [UsuarioController::class, 'index']);
