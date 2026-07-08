@@ -45,7 +45,7 @@ class SaidaTest extends TestCase
         return [
             'tipo' => 'SAÍDA', 'tipo_saida' => 'Retirada', 'equipe' => 'Equipe 01', 'colaborador' => 'Pedro',
             'entregador' => 'João', 'resp_almox' => 'Maria', 'almoxarifado' => 'Almox Central', 'data' => '2026-07-07',
-            'itens' => [['codigo' => 'LUV-001', 'variacao_id' => $this->variacao->id, 'nome' => 'Luva de Proteção', 'unid' => 'UNID', 'qtd' => $qtd]],
+            'itens' => [['codigo' => 'LUV-001', 'variacao_id' => $this->variacao->id, 'nome' => 'Luva de Proteção', 'unid' => 'UNID', 'qtd' => $qtd, 'destino' => 'Para a Equipe']],
         ];
     }
 
@@ -63,6 +63,23 @@ class SaidaTest extends TestCase
             ->getJson('/api/saidas/cupons')
             ->assertJsonCount(1, 'data.data')
             ->assertJsonPath('data.data.0.status', 'ATIVO');
+    }
+
+    public function test_destino_frota_exige_placa(): void
+    {
+        $payload = $this->payloadSaida(1);
+        $payload['itens'][0]['destino'] = 'Frota';
+
+        $this->actingAs($this->operador)
+            ->postJson('/api/saidas', $payload)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['itens.0.destino_frota']);
+
+        $payload['itens'][0]['destino_frota'] = 'ABC-1234';
+
+        $this->actingAs($this->operador)
+            ->postJson('/api/saidas', $payload)
+            ->assertStatus(201);
     }
 
     public function test_nao_permite_saida_maior_que_estoque_disponivel(): void

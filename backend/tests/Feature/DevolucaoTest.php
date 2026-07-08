@@ -34,7 +34,7 @@ class DevolucaoTest extends TestCase
         $this->numeroPedidoOrigem = $this->actingAs($this->usuario)->postJson('/api/saidas', [
             'tipo' => 'SAÍDA', 'tipo_saida' => 'Retirada', 'equipe' => 'Equipe 02',
             'entregador' => 'Ana', 'resp_almox' => 'Bia', 'almoxarifado' => 'Almox Central', 'data' => '2026-07-07',
-            'itens' => [['codigo' => 'CAP-001', 'variacao_id' => $this->variacao->id, 'nome' => 'Capacete', 'unid' => 'UNID', 'qtd' => 6]],
+            'itens' => [['codigo' => 'CAP-001', 'variacao_id' => $this->variacao->id, 'nome' => 'Capacete', 'unid' => 'UNID', 'qtd' => 6, 'destino' => 'Para a Equipe']],
         ])->json('data.numero_pedido');
     }
 

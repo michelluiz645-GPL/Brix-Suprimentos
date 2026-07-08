@@ -54,6 +54,7 @@ class SaidaController extends Controller
                     'itens'         => $linhas->map(fn ($l) => [
                         'movimento_id' => $l->id, 'codigo' => $l->codigo, 'variacao_id' => $l->produto_variacao_id,
                         'nome' => $l->nome, 'unid' => $l->unid, 'qtd' => (float) $l->qtd, 'preco' => (float) $l->preco, 'obs' => $l->obs,
+                        'destino' => $l->destino, 'destino_frota' => $l->destino_frota,
                     ])->values(),
                 ];
             })

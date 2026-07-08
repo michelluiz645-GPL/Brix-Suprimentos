@@ -4,16 +4,21 @@ import PageHeader from "@/components/PageHeader";
 import { useToast } from "@/hooks/useToast";
 import ToastContainer from "@/components/Toast";
 import { formatCurrency, today } from "@/utils/formatters";
-import type { Product } from "@/types";
+import type { Product, Team, Employee, Vehicle } from "@/types";
 import { Plus, Trash2 } from "lucide-react";
 
-interface SaidaItem { codigo: string; variacao_id: number | null; nome: string; unid: string; qtd: number; preco: number; obs?: string; estoque_disponivel?: number; }
+interface SaidaItem { codigo: string; variacao_id: number | null; nome: string; unid: string; qtd: number; preco: number; obs?: string; destino: string; destino_frota?: string; estoque_disponivel?: number; }
 
 const TIPOS_SAIDA = ["Retirada", "Entrega"];
+const DESTINOS = ["Para a Equipe", "Roçada", "Obra", "Administração", "Manutenção", "Consumível", "Frota", "Outros"];
+const itemVazio = (): SaidaItem => ({ codigo: "", variacao_id: null, nome: "", unid: "", qtd: 1, preco: 0, destino: DESTINOS[0] });
 
 export default function Saida() {
   const toast = useToast();
   const [products, setProducts] = useState<Product[]>([]);
+  const [equipes, setEquipes]   = useState<Team[]>([]);
+  const [funcionarios, setFuncionarios] = useState<Employee[]>([]);
+  const [veiculos, setVeiculos] = useState<Vehicle[]>([]);
   const [tipoSaida, setTipoSaida] = useState(TIPOS_SAIDA[0]);
   const [equipe, setEquipe]     = useState("");
   const [colaborador, setColab] = useState("");
@@ -21,7 +26,7 @@ export default function Saida() {
   const [respAlmox, setResp]    = useState("");
   const [almox, setAlmox]       = useState("");
   const [data, setData]         = useState(today());
-  const [itens, setItens]       = useState<SaidaItem[]>([{ codigo: "", variacao_id: null, nome: "", unid: "", qtd: 1, preco: 0 }]);
+  const [itens, setItens]       = useState<SaidaItem[]>([itemVazio()]);
   const [loading, setLoading]   = useState(false);
 
   useEffect(() => {
@@ -29,7 +34,28 @@ export default function Saida() {
       const d = (r as { data: Product[] }).data ?? [];
       setProducts(Array.isArray(d) ? d : Object.values(d));
     });
+    api.equipes.list().then((r) => {
+      const d = (r as { data: Team[] }).data ?? [];
+      setEquipes(Array.isArray(d) ? d : Object.values(d));
+    });
+    api.funcionarios.list("status=ATIVO").then((r) => {
+      const d = (r as { data: Employee[] }).data ?? [];
+      setFuncionarios(Array.isArray(d) ? d : Object.values(d));
+    });
+    api.veiculos.list().then((r) => {
+      const d = (r as { data: Vehicle[] }).data ?? [];
+      const lista: Vehicle[] = Array.isArray(d) ? d : Object.values(d);
+      setVeiculos(lista.filter((v) => v.status === "ATIVO"));
+    });
   }, []);
+
+  const equipeSelecionada = equipes.find((e) => e.numero === equipe);
+  const colaboradoresDaEquipe = funcionarios.filter((f) => f.equipe_num === equipe);
+
+  const selectEquipe = (numero: string) => {
+    setEquipe(numero);
+    setColab("");
+  };
 
   const nomeComMarca = (prod: Product, variacaoId: number) => {
     const v = prod.variacoes.find((x) => x.id === variacaoId);
@@ -63,7 +89,7 @@ export default function Saida() {
 
   const updateItem = (idx: number, field: keyof SaidaItem, value: string | number) =>
     setItens((p) => p.map((it, i) => i === idx ? { ...it, [field]: value } : it));
-  const addItem    = () => setItens((p) => [...p, { codigo: "", variacao_id: null, nome: "", unid: "", qtd: 1, preco: 0 }]);
+  const addItem    = () => setItens((p) => [...p, itemVazio()]);
   const removeItem = (idx: number) => setItens((p) => p.filter((_, i) => i !== idx));
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -76,14 +102,19 @@ export default function Saida() {
     if (itens.some((i) => !i.codigo))   { toast.error("Todos os itens precisam ter um produto selecionado."); return; }
     if (itens.some((i) => !i.variacao_id)) { toast.error("Selecione a marca de cada item — o produto tem mais de uma cadastrada."); return; }
     if (itens.some((i) => i.qtd <= 0))  { toast.error("Todos os itens precisam ter quantidade maior que zero."); return; }
+    if (itens.some((i) => !i.destino))  { toast.error("Todos os itens precisam ter um destino selecionado."); return; }
+    if (itens.some((i) => i.destino === "Frota" && !i.destino_frota?.trim())) { toast.error("Informe a placa da frota para itens com destino \"Frota\"."); return; }
     const over = itens.find((it) => it.estoque_disponivel !== undefined && it.qtd > it.estoque_disponivel);
     if (over) { toast.error(`"${over.nome}" — quantidade solicitada (${over.qtd}) maior que o estoque disponível (${over.estoque_disponivel}).`); return; }
     setLoading(true);
     try {
-      const res = await api.saidas.create({ tipo: "SAÍDA", tipo_saida: tipoSaida, equipe, colaborador, entregador, resp_almox: respAlmox, almoxarifado: almox, data, itens }) as { data: { numero_pedido: string } };
+      const res = await api.saidas.create({
+        tipo: "SAÍDA", tipo_saida: tipoSaida, equipe, nome_equipe: equipeSelecionada?.nome ?? equipe,
+        colaborador, entregador, resp_almox: respAlmox, almoxarifado: almox, data, itens,
+      }) as { data: { numero_pedido: string } };
       toast.success(`Saída registrada! Cupom nº ${res.data?.numero_pedido ?? ""}`);
       setEquipe(""); setColab(""); setEntreg(""); setResp(""); setAlmox("");
-      setItens([{ codigo: "", variacao_id: null, nome: "", unid: "", qtd: 1, preco: 0 }]);
+      setItens([itemVazio()]);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Não foi possível registrar a saída. Tente novamente.");
     } finally { setLoading(false); }
@@ -104,9 +135,23 @@ export default function Saida() {
                 {TIPOS_SAIDA.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Equipe / Destinatário *</label>
+              <select value={equipe} onChange={(e) => selectEquipe(e.target.value)}
+                className="w-full px-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#EA6C0A]">
+                <option value="">— Selecione —</option>
+                {equipes.map((eq) => <option key={eq.numero} value={eq.numero}>{eq.numero} — {eq.nome}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Colaborador</label>
+              <select value={colaborador} onChange={(e) => setColab(e.target.value)} disabled={!equipe}
+                className={`w-full px-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#EA6C0A] ${!equipe ? "opacity-60 cursor-not-allowed" : ""}`}>
+                <option value="">{equipe ? "— Selecione —" : "Selecione a equipe primeiro"}</option>
+                {colaboradoresDaEquipe.map((f) => <option key={f.id} value={f.nome}>{f.nome} — {f.funcao}</option>)}
+              </select>
+            </div>
             {[
-              { label: "Equipe / Destinatário *", value: equipe, set: setEquipe, placeholder: "Ex: Equipe 01" },
-              { label: "Colaborador", value: colaborador, set: setColab, placeholder: "Nome do colaborador" },
               { label: "Entregador *", value: entregador, set: setEntreg, placeholder: "Quem entregou" },
               { label: "Resp. Suprimentos *", value: respAlmox, set: setResp, placeholder: "Responsável Suprimentos" },
               { label: "Suprimentos *", value: almox, set: setAlmox, placeholder: "Ex: Almox Central" },
@@ -135,7 +180,7 @@ export default function Saida() {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead><tr className="bg-slate-50 border-b border-slate-100">
-                {["Produto", "Marca", "Disponível", "Qtd", "Unid.", "Observação", ""].map((h) => (
+                {["Produto", "Marca", "Disponível", "Qtd", "Unid.", "Destino", "Observação", ""].map((h) => (
                   <th key={h} className="p-3 font-semibold text-slate-500 text-left">{h}</th>
                 ))}
               </tr></thead>
@@ -173,6 +218,19 @@ export default function Saida() {
                         {over && <div className="text-[10px] text-rose-500 font-bold mt-0.5">Excede estoque!</div>}
                       </td>
                       <td className="p-2 font-mono text-slate-500">{item.unid || "—"}</td>
+                      <td className="p-2">
+                        <select value={item.destino} onChange={(e) => updateItem(idx, "destino", e.target.value)}
+                          className="w-32 bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-xs focus:outline-none focus:border-[#EA6C0A]">
+                          {DESTINOS.map((d) => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                        {item.destino === "Frota" && (
+                          <select value={item.destino_frota ?? ""} onChange={(e) => updateItem(idx, "destino_frota", e.target.value)}
+                            className="w-32 mt-1 bg-amber-50 border border-amber-300 rounded-lg px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-[#EA6C0A]">
+                            <option value="">— Veículo —</option>
+                            {veiculos.map((v) => <option key={v.id} value={v.placa}>{v.placa} — {v.modelo}</option>)}
+                          </select>
+                        )}
+                      </td>
                       <td className="p-2">
                         <input value={item.obs ?? ""} onChange={(e) => updateItem(idx, "obs", e.target.value)} placeholder="Observação"
                           className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-xs focus:outline-none focus:border-[#EA6C0A]" />

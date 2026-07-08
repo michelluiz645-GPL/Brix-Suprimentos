@@ -35,7 +35,7 @@ class EntregaTest extends TestCase
         $this->actingAs($this->usuario)->postJson('/api/saidas', [
             'tipo' => 'SAÍDA', 'tipo_saida' => $tipoSaida, 'equipe' => 'Obra Centro',
             'entregador' => 'Carlos', 'resp_almox' => 'Maria', 'almoxarifado' => 'Almox Central', 'data' => '2026-07-07',
-            'itens' => [['codigo' => 'CIM-001', 'variacao_id' => $this->variacaoId, 'nome' => 'Cimento', 'unid' => 'UNID', 'qtd' => 10]],
+            'itens' => [['codigo' => 'CIM-001', 'variacao_id' => $this->variacaoId, 'nome' => 'Cimento', 'unid' => 'UNID', 'qtd' => 10, 'destino' => 'Obra']],
         ]);
     }
 
