@@ -36,6 +36,7 @@ class SaidaTest extends TestCase
         ]);
         $this->produto = Produto::create([
             'codigo_produto' => 'LUV-001', 'nome' => 'Luva de Proteção', 'categoria' => 'EPI', 'unid' => 'UNID',
+            'dias_validade_epi' => 90,
         ]);
         $this->variacao = $this->produto->variacoes()->create(['marca' => '3M', 'preco' => 10, 'estoque' => 20]);
     }
@@ -45,7 +46,7 @@ class SaidaTest extends TestCase
         return [
             'tipo' => 'SAÍDA', 'tipo_saida' => 'Retirada', 'equipe' => 'Equipe 01', 'colaborador' => 'Pedro',
             'entregador' => 'João', 'resp_almox' => 'Maria', 'almoxarifado' => 'Almox Central', 'data' => '2026-07-07',
-            'itens' => [['codigo' => 'LUV-001', 'variacao_id' => $this->variacao->id, 'nome' => 'Luva de Proteção', 'unid' => 'UNID', 'qtd' => $qtd, 'destino' => 'Para a Equipe']],
+            'itens' => [['codigo' => 'LUV-001', 'variacao_id' => $this->variacao->id, 'nome' => 'Luva de Proteção', 'unid' => 'UNID', 'qtd' => $qtd, 'destino' => 'Para a Equipe', 'colaborador_epi' => 'Carlos Souza']],
         ];
     }
 
@@ -80,6 +81,33 @@ class SaidaTest extends TestCase
         $this->actingAs($this->operador)
             ->postJson('/api/saidas', $payload)
             ->assertStatus(201);
+    }
+
+    public function test_item_epi_exige_colaborador(): void
+    {
+        $payload = $this->payloadSaida(1);
+        unset($payload['itens'][0]['colaborador_epi']);
+
+        $this->actingAs($this->operador)
+            ->postJson('/api/saidas', $payload)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['itens.0.colaborador_epi']);
+    }
+
+    public function test_saida_de_epi_calcula_vencimento_e_gera_registro_automatico(): void
+    {
+        $this->actingAs($this->operador)
+            ->postJson('/api/saidas', $this->payloadSaida(1))
+            ->assertStatus(201);
+
+        $movimento = \App\Models\Movimento::where('tipo', 'SAÍDA')->firstOrFail();
+        $this->assertSame('Carlos Souza', $movimento->colaborador_epi);
+        $this->assertSame('2026-10-05', $movimento->epi_vencimento->format('Y-m-d')); // 2026-07-07 + 90 dias
+
+        $registro = \App\Models\EpiRegistro::firstOrFail();
+        $this->assertSame('Carlos Souza', $registro->funcionario);
+        $this->assertSame('Luva de Proteção', $registro->epi);
+        $this->assertSame('2026-10-05', $registro->proxima_troca->format('Y-m-d'));
     }
 
     public function test_nao_permite_saida_maior_que_estoque_disponivel(): void

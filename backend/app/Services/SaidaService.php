@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Models\EpiRegistro;
 use App\Models\Movimento;
 use App\Models\Numerador;
 use App\Models\ProdutoVariacao;
 use App\Models\User;
+use Carbon\Carbon;
 
 class SaidaService
 {
@@ -33,13 +35,23 @@ class SaidaService
         foreach ($dados['itens'] as $i => $item) {
             $variacoes[$i]->decrement('estoque', $item['qtd']);
 
+            $produto = $variacoes[$i]->produto;
+            $isEpi   = $produto?->categoria === 'EPI';
+            $nomeItem = $item['nome'] ?: $produto?->nome ?? '';
+
+            // RF-006/RF-023 — para EPI, a validade conta a partir da data da
+            // saída (não da entrada), usando os dias cadastrados na ficha do produto.
+            $epiVencimento = $isEpi && $produto->dias_validade_epi
+                ? Carbon::parse($dados['data'])->addDays($produto->dias_validade_epi)
+                : null;
+
             Movimento::create([
                 'numero_pedido'       => $numeroPedido,
                 'tipo'                => 'SAÍDA',
                 'tipo_saida'          => $dados['tipo_saida'],
                 'codigo'              => $item['codigo'],
                 'produto_variacao_id' => $variacoes[$i]->id,
-                'nome'                => $item['nome'] ?: $variacoes[$i]->produto?->nome ?? '',
+                'nome'                => $nomeItem,
                 'unid'                => $item['unid'] ?? '',
                 'qtd'                 => $item['qtd'],
                 'preco'               => $item['preco'] ?? $variacoes[$i]->preco,
@@ -53,9 +65,22 @@ class SaidaService
                 'equipe'              => $dados['equipe'],
                 'nome_equipe'         => $dados['nome_equipe'] ?? $dados['equipe'],
                 'colaborador'         => $dados['colaborador'] ?? null,
+                'colaborador_epi'     => $isEpi ? ($item['colaborador_epi'] ?? null) : null,
+                'epi_vencimento'      => $epiVencimento,
                 'entregador'          => $dados['entregador'],
                 'status'              => 'ATIVO',
             ]);
+
+            if ($isEpi && ! empty($item['colaborador_epi']) && $epiVencimento) {
+                EpiRegistro::create([
+                    'funcionario'    => $item['colaborador_epi'],
+                    'epi'            => $nomeItem,
+                    'data_entrega'   => $dados['data'],
+                    'proxima_troca'  => $epiVencimento,
+                    'responsavel'    => $dados['resp_almox'],
+                    'registrado_por' => $usuario->nome,
+                ]);
+            }
         }
 
         return $numeroPedido;

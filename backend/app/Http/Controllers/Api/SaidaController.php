@@ -55,6 +55,7 @@ class SaidaController extends Controller
                         'movimento_id' => $l->id, 'codigo' => $l->codigo, 'variacao_id' => $l->produto_variacao_id,
                         'nome' => $l->nome, 'unid' => $l->unid, 'qtd' => (float) $l->qtd, 'preco' => (float) $l->preco, 'obs' => $l->obs,
                         'destino' => $l->destino, 'destino_frota' => $l->destino_frota,
+                        'colaborador_epi' => $l->colaborador_epi, 'epi_vencimento' => $l->epi_vencimento?->format('Y-m-d'),
                     ])->values(),
                 ];
             })

@@ -49,7 +49,7 @@ class ModuloSeeder extends Seeder
             ['chave' => 'suprimentos_kobo', 'nome' => 'Suprimentos KOBO', 'setores_aplicaveis' => [$alm, $eng]],
             ['chave' => 'solicitacao_compra', 'nome' => 'Solicitação de Compra', 'setores_aplicaveis' => [$eng, $man]],
             ['chave' => 'pedido_compra', 'nome' => 'Pedido de Compra', 'setores_aplicaveis' => [$eng, $man]],
-            ['chave' => 'seguranca_epi', 'nome' => 'Segurança & EPI', 'setores_aplicaveis' => [$eng, $man]],
+            ['chave' => 'seguranca_epi', 'nome' => 'Segurança & EPI', 'setores_aplicaveis' => [$alm, $eng, $man]],
             ['chave' => 'equipamentos_pesados', 'nome' => 'Equipamentos Pesados', 'setores_aplicaveis' => [$eng, $man]],
             ['chave' => 'debitos_manutencao', 'nome' => 'Débitos de Manutenção', 'setores_aplicaveis' => [$eng, $man]],
             ['chave' => 'seguranca_dados', 'nome' => 'Segurança de Dados / Backup', 'setores_aplicaveis' => [$alm, $eng]],

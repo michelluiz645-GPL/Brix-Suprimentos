@@ -7,7 +7,7 @@ import { formatCurrency, today } from "@/utils/formatters";
 import type { Product, Team, Employee, Vehicle } from "@/types";
 import { Plus, Trash2 } from "lucide-react";
 
-interface SaidaItem { codigo: string; variacao_id: number | null; nome: string; unid: string; qtd: number; preco: number; obs?: string; destino: string; destino_frota?: string; estoque_disponivel?: number; }
+interface SaidaItem { codigo: string; variacao_id: number | null; nome: string; unid: string; qtd: number; preco: number; obs?: string; destino: string; destino_frota?: string; colaborador_epi?: string; estoque_disponivel?: number; }
 
 const TIPOS_SAIDA = ["Retirada", "Entrega"];
 const DESTINOS = ["Para a Equipe", "Roçada", "Obra", "Administração", "Manutenção", "Consumível", "Frota", "Outros"];
@@ -104,6 +104,8 @@ export default function Saida() {
     if (itens.some((i) => i.qtd <= 0))  { toast.error("Todos os itens precisam ter quantidade maior que zero."); return; }
     if (itens.some((i) => !i.destino))  { toast.error("Todos os itens precisam ter um destino selecionado."); return; }
     if (itens.some((i) => i.destino === "Frota" && !i.destino_frota?.trim())) { toast.error("Informe a placa da frota para itens com destino \"Frota\"."); return; }
+    const itemEpiSemColaborador = itens.find((i) => products.find((p) => p.codigo_produto === i.codigo)?.categoria === "EPI" && !i.colaborador_epi?.trim());
+    if (itemEpiSemColaborador) { toast.error(`Selecione o colaborador para o item de EPI "${itemEpiSemColaborador.nome}".`); return; }
     const over = itens.find((it) => it.estoque_disponivel !== undefined && it.qtd > it.estoque_disponivel);
     if (over) { toast.error(`"${over.nome}" — quantidade solicitada (${over.qtd}) maior que o estoque disponível (${over.estoque_disponivel}).`); return; }
     setLoading(true);
@@ -180,7 +182,7 @@ export default function Saida() {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead><tr className="bg-slate-50 border-b border-slate-100">
-                {["Produto", "Marca", "Disponível", "Qtd", "Unid.", "Destino", "Observação", ""].map((h) => (
+                {["Produto", "Marca", "Disponível", "Qtd", "Unid.", "Destino", "Colaborador (EPI)", "Observação", ""].map((h) => (
                   <th key={h} className="p-3 font-semibold text-slate-500 text-left">{h}</th>
                 ))}
               </tr></thead>
@@ -228,6 +230,15 @@ export default function Saida() {
                             className="w-32 mt-1 bg-amber-50 border border-amber-300 rounded-lg px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-[#EA6C0A]">
                             <option value="">— Veículo —</option>
                             {veiculos.map((v) => <option key={v.id} value={v.placa}>{v.placa} — {v.modelo}</option>)}
+                          </select>
+                        )}
+                      </td>
+                      <td className="p-2">
+                        {prod?.categoria === "EPI" && (
+                          <select value={item.colaborador_epi ?? ""} onChange={(e) => updateItem(idx, "colaborador_epi", e.target.value)}
+                            className="w-40 bg-amber-50 border border-amber-300 rounded-lg px-2 py-2 text-xs focus:outline-none focus:border-[#EA6C0A]">
+                            <option value="">— Colaborador —</option>
+                            {funcionarios.map((f) => <option key={f.id} value={f.nome}>{f.nome} — {f.funcao}</option>)}
                           </select>
                         )}
                       </td>

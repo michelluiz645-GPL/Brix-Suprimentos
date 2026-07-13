@@ -60,13 +60,13 @@ const MENUS_BY_SECTOR: Record<string, string[]> = {
     "Dashboard", "Consultar", "Entrada", "Saída", "Histórico Cupons",
     "Devolução", "Entregas Pend.", "Combustíveis", "Produtos",
     "Valor Estoque", "Inventário", "Funcionários", "Equipes", "Frotas",
-    "Reposição Auto.", "Ped. Orçamento",
+    "Reposição Auto.", "Ped. Orçamento", "EPI",
     "Suprimentos Kobo", "Backup", "Usuários",
   ],
   ALMOXARIFADO_OPERADOR: [
     "Dashboard", "Consultar", "Entrada", "Saída", "Histórico Cupons",
     "Devolução", "Entregas Pend.", "Combustíveis", "Produtos",
-    "Funcionários", "Equipes", "Frotas", "Reposição Auto.", "Ped. Orçamento",
+    "Funcionários", "Equipes", "Frotas", "Reposição Auto.", "Ped. Orçamento", "EPI",
   ],
   ENGENHARIA_ADMIN: [
     "Dashboard", "Obras & Projetos", "Catálogo Obra", "Fornecedores",

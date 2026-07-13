@@ -293,7 +293,9 @@ Vinculado a uma SC de origem. Fornecedor do cadastro ou manual. Múltiplos itens
 ---
 
 ### RF-023 — Segurança & EPI
-Registro de entrega de EPI por colaborador. Situação: válido / próximo ao vencimento (≤ 30 dias, âmbar) / vencido (vermelho). Saída de item EPI gera registro aqui automaticamente.
+**Setores:** ALMOXARIFADO, ENGENHARIA, MANUTENÇÃO
+
+Registro de entrega de EPI por colaborador. Situação: válido / próximo ao vencimento (≤ 30 dias, âmbar) / vencido (vermelho). Saída de item EPI (RF-006) exige colaborador específico por item e gera registro aqui automaticamente — a validade conta a partir da data da saída, somando os dias cadastrados na ficha do produto (RF-011).
 
 ---
 
@@ -361,7 +363,7 @@ Para cada produto crítico, botão "Gerar Pedido de Reposição". Quantidade sug
 | Suprimentos KOBO              | — | ✅ | ✅ | ✅ | — | — |
 | Solicitação de Compra         | — | — | ✅ | ✅ | ✅ | ✅ |
 | Pedido de Compra              | — | — | ✅ | ✅ | ✅ | ✅ |
-| Segurança & EPI               | — | — | ✅ | ✅ | ✅ | ✅ |
+| Segurança & EPI               | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Equipamentos Pesados          | — | — | ✅ | ✅ | ✅ | ✅ |
 | Débitos de Manutenção         | — | — | ✅ | ✅ | ✅ | ✅ |
 | Segurança de Dados            | — | ✅ | — | ✅ | — | — |

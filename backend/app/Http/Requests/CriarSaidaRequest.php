@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Produto;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -31,6 +32,7 @@ class CriarSaidaRequest extends FormRequest
             'itens.*.obs'           => ['nullable', 'string'],
             'itens.*.destino'       => ['required', Rule::in(['Para a Equipe', 'Roçada', 'Obra', 'Administração', 'Manutenção', 'Consumível', 'Frota', 'Outros'])],
             'itens.*.destino_frota' => ['nullable', 'string', 'max:20'],
+            'itens.*.colaborador_epi' => ['nullable', 'string', 'max:150'],
         ];
     }
 
@@ -52,6 +54,11 @@ class CriarSaidaRequest extends FormRequest
             foreach ($this->input('itens', []) as $i => $item) {
                 if (($item['destino'] ?? null) === 'Frota' && empty($item['destino_frota'])) {
                     $validator->errors()->add("itens.{$i}.destino_frota", 'Informe a placa da frota para itens com destino "Frota".');
+                }
+
+                $produto = Produto::where('codigo_produto', $item['codigo'] ?? null)->first();
+                if ($produto?->categoria === 'EPI' && empty($item['colaborador_epi'])) {
+                    $validator->errors()->add("itens.{$i}.colaborador_epi", 'Selecione o colaborador para o item de EPI.');
                 }
             }
         });
