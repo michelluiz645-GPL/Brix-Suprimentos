@@ -34,8 +34,13 @@ class PedidoOrcamentoService
         'Entrega concluída',
     ];
 
+    /**
+     * @throws \InvalidArgumentException se algum item (por código de produto) já tiver um pedido em aberto
+     */
     public function criar(array $dados, User $solicitante): PedidoOrcamento
     {
+        $this->garantirSemPedidoAbertoParaOsProdutos($dados['itens']);
+
         return DB::transaction(function () use ($dados, $solicitante) {
             $pedido = PedidoOrcamento::create([
                 'numero_sc'      => $dados['numero_sc'] ?? $this->gerarNumero(),
@@ -307,6 +312,32 @@ class PedidoOrcamentoService
         })->all();
 
         $pedido->update(['timeline' => $timeline]);
+    }
+
+    /**
+     * RF-029 — não deixa gerar um novo pedido de reposição para um produto
+     * que já tem um pedido em aberto (qualquer status exceto CONCLUIDO/REJEITADO).
+     * Itens sem codigo_produto (solicitações manuais de Manutenção/Engenharia,
+     * que descrevem peças por texto livre) não entram nessa checagem.
+     *
+     * @throws \InvalidArgumentException
+     */
+    private function garantirSemPedidoAbertoParaOsProdutos(array $itens): void
+    {
+        $codigos = array_filter(array_column($itens, 'codigo_produto'));
+        if (empty($codigos)) {
+            return;
+        }
+
+        $abertos = PedidoOrcamento::whereNotIn('status', ['CONCLUIDO', 'REJEITADO'])->get();
+
+        foreach ($abertos as $pedido) {
+            foreach ($pedido->itens ?? [] as $item) {
+                if (in_array($item['codigo_produto'] ?? null, $codigos, true)) {
+                    throw new \InvalidArgumentException("Já existe um pedido em aberto ({$pedido->numero_sc}) para o produto \"{$item['codigo_produto']}\".");
+                }
+            }
+        }
     }
 
     private function gerarNumero(): string

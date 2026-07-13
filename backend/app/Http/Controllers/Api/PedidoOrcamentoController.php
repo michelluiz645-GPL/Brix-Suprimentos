@@ -28,7 +28,11 @@ class PedidoOrcamentoController extends Controller
 
     public function store(CriarPedidoOrcamentoRequest $request): JsonResponse
     {
-        $pedido = $this->service->criar($request->validated(), $request->user());
+        try {
+            $pedido = $this->service->criar($request->validated(), $request->user());
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['data' => null, 'message' => $e->getMessage()], 422);
+        }
 
         return response()->json([
             'data'    => $this->serialize($pedido),

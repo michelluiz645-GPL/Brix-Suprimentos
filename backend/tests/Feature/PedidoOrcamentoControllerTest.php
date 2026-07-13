@@ -95,4 +95,33 @@ class PedidoOrcamentoControllerTest extends TestCase
             ->assertStatus(200)
             ->assertJsonPath('data.status', 'AGUARDANDO_APROVACAO_COMPRA');
     }
+
+    public function test_nao_permite_novo_pedido_de_reposicao_para_produto_com_pedido_em_aberto(): void
+    {
+        $payload = [
+            'data' => '2026-07-13', 'setor' => 'ALMOXARIFADO', 'destino' => 'Reposição de estoque — Filtro',
+            'tipo_destino' => 'ESTOQUE', 'urgencia' => 'CRITICA',
+            'itens' => [['descricao' => 'Filtro de Óleo', 'quantidade' => 10, 'unidade' => 'UNID', 'codigo_produto' => '902']],
+        ];
+
+        $this->actingAs($this->admin)->postJson('/api/pedidos-orcamento', $payload)->assertStatus(201);
+
+        $this->actingAs($this->admin)->postJson('/api/pedidos-orcamento', $payload)
+            ->assertStatus(422)
+            ->assertJsonFragment(['message' => 'Já existe um pedido em aberto (SC-ORC-2026-0001) para o produto "902".']);
+    }
+
+    public function test_permite_novo_pedido_apos_o_anterior_ser_rejeitado(): void
+    {
+        $payload = [
+            'data' => '2026-07-13', 'setor' => 'ALMOXARIFADO', 'destino' => 'Reposição de estoque — Filtro',
+            'tipo_destino' => 'ESTOQUE', 'urgencia' => 'CRITICA',
+            'itens' => [['descricao' => 'Filtro de Óleo', 'quantidade' => 10, 'unidade' => 'UNID', 'codigo_produto' => '902']],
+        ];
+
+        $pedido = $this->actingAs($this->admin)->postJson('/api/pedidos-orcamento', $payload)->json('data');
+        PedidoOrcamento::findOrFail($pedido['id'])->update(['status' => 'REJEITADO']);
+
+        $this->actingAs($this->admin)->postJson('/api/pedidos-orcamento', $payload)->assertStatus(201);
+    }
 }

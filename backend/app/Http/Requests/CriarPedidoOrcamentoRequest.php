@@ -22,6 +22,9 @@ class CriarPedidoOrcamentoRequest extends FormRequest
             'itens.*.descricao'     => ['required', 'string'],
             'itens.*.quantidade'    => ['required', 'numeric', 'min:0.01'],
             'itens.*.unidade'       => ['required', 'string'],
+            // Só preenchido pela Reposição Automática (RF-029) — usado para
+            // bloquear um novo pedido enquanto já houver um em aberto para o produto.
+            'itens.*.codigo_produto' => ['nullable', 'string'],
         ];
     }
 

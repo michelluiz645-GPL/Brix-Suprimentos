@@ -11,20 +11,36 @@ const inp = "w-full px-3 py-2.5 text-sm bg-slate-50 border border-slate-200 roun
 const lbl = "text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1";
 
 interface PedidoModal { produto: Product; qtd_sugerida: number; data_entrega: string; }
+interface PedidoOrcamentoResumo { numero_sc: string; status: string; itens: { codigo_produto?: string }[]; }
+
+const STATUS_FECHADOS = ["CONCLUIDO", "REJEITADO"];
 
 export default function ReposicaoAutomatica() {
   const toast = useToast();
   const [produtos, setProdutos] = useState<Product[]>([]);
+  const [pendentes, setPendentes] = useState<Record<string, string>>({}); // codigo_produto -> numero_sc
   const [loading, setLoading] = useState(true);
   const [gerando, setGerando] = useState(false);
   const [modal, setModal] = useState<PedidoModal | null>(null);
 
   const carregar = () => {
     setLoading(true);
-    api.produtos.list().then((r) => {
-      const d = (r as { data: Product[] }).data ?? [];
-      const lista: Product[] = Array.isArray(d) ? d : Object.values(d);
-      setProdutos(lista);
+    Promise.all([
+      api.produtos.list(),
+      api.pedidosOrcamento.list(),
+    ]).then(([produtosRes, pedidosRes]) => {
+      const d = (produtosRes as { data: Product[] }).data ?? [];
+      setProdutos(Array.isArray(d) ? d : Object.values(d));
+
+      const pedidos = pedidosRes as unknown as PedidoOrcamentoResumo[];
+      const mapa: Record<string, string> = {};
+      for (const pedido of pedidos) {
+        if (STATUS_FECHADOS.includes(pedido.status)) continue;
+        for (const item of pedido.itens ?? []) {
+          if (item.codigo_produto) mapa[item.codigo_produto] = pedido.numero_sc;
+        }
+      }
+      setPendentes(mapa);
     }).catch(() => toast.error("Não foi possível carregar os produtos."))
       .finally(() => setLoading(false));
   };
@@ -66,6 +82,7 @@ export default function ReposicaoAutomatica() {
           descricao: modal.produto.nome,
           quantidade: modal.qtd_sugerida,
           unidade: modal.produto.unid,
+          codigo_produto: modal.produto.codigo_produto,
         }],
       }) as { data: { numero_sc: string } };
       toast.success(`Pedido de orçamento ${res.data?.numero_sc ?? ""} gerado com sucesso! Vai para a fila de cotação do Almoxarifado.`);
@@ -131,10 +148,16 @@ export default function ReposicaoAutomatica() {
                         </span>
                       </td>
                       <td className="p-3">
-                        <button onClick={() => abrirModal(p)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-[#EA6C0A] rounded-lg hover:bg-[#C75B12] transition-colors">
-                          <ShoppingCart size={12} /> Gerar Pedido
-                        </button>
+                        {pendentes[p.codigo_produto] ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-amber-700 bg-amber-100 rounded-lg" title={`Já existe um pedido em aberto: ${pendentes[p.codigo_produto]}`}>
+                            <AlertTriangle size={12} /> Pendente ({pendentes[p.codigo_produto]})
+                          </span>
+                        ) : (
+                          <button onClick={() => abrirModal(p)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-[#EA6C0A] rounded-lg hover:bg-[#C75B12] transition-colors">
+                            <ShoppingCart size={12} /> Gerar Pedido
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
