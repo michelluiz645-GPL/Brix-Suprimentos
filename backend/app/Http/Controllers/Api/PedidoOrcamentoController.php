@@ -58,10 +58,21 @@ class PedidoOrcamentoController extends Controller
         return response()->json(['data' => $this->serialize($pedidoOrcamento->fresh()), 'message' => 'Enviado para aprovação da Manutenção.']);
     }
 
+    /**
+     * A responsabilidade exigida depende do setor do pedido: para MANUTENCAO
+     * (e demais setores), quem aprova o orçamento é a Manutenção; para
+     * ALMOXARIFADO (Reposição Automática), não existe uma Manutenção externa
+     * envolvida — quem aprova é o próprio responsável de Suprimentos.
+     */
     public function aprovarManutencao(AprovarManutencaoPedidoOrcamentoRequest $request, PedidoOrcamento $pedidoOrcamento): JsonResponse
     {
         if ($erro = $this->garantirStatus($pedidoOrcamento, 'AGUARDANDO_APROVACAO_MANUTENCAO')) {
             return $erro;
+        }
+
+        $responsabilidadeExigida = $pedidoOrcamento->setor === 'ALMOXARIFADO' ? 'aprovador_suprimentos' : 'aprovador_manutencao';
+        if (! $request->user()->temResponsabilidade('pedido_orcamento', $responsabilidadeExigida)) {
+            return $this->erroResponsabilidade();
         }
 
         try {
@@ -70,18 +81,20 @@ class PedidoOrcamentoController extends Controller
             return response()->json(['data' => null, 'message' => $e->getMessage()], 422);
         }
 
-        return response()->json(['data' => $this->serialize($pedidoOrcamento->fresh()), 'message' => 'Aprovado pela Manutenção.']);
+        return response()->json(['data' => $this->serialize($pedidoOrcamento->fresh()), 'message' => 'Aprovado.']);
     }
 
     /**
      * A responsabilidade exigida para rejeitar depende do estágio atual do
      * pedido (Manutenção rejeita o orçamento, Suprimentos rejeita a compra) —
      * por isso a checagem acontece aqui, e não em uma rota/middleware fixos.
+     * Pedidos do ALMOXARIFADO não passam pela Manutenção: quem rejeita o
+     * orçamento nesse caso também é o aprovador de Suprimentos.
      */
     public function rejeitar(RejeitarPedidoOrcamentoRequest $request, PedidoOrcamento $pedidoOrcamento): JsonResponse
     {
         $responsabilidadeExigida = match ($pedidoOrcamento->status) {
-            'AGUARDANDO_APROVACAO_MANUTENCAO' => 'aprovador_manutencao',
+            'AGUARDANDO_APROVACAO_MANUTENCAO' => $pedidoOrcamento->setor === 'ALMOXARIFADO' ? 'aprovador_suprimentos' : 'aprovador_manutencao',
             'AGUARDANDO_APROVACAO_COMPRA'      => 'aprovador_suprimentos',
             default => null,
         };

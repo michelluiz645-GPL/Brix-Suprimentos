@@ -55,22 +55,20 @@ export default function ReposicaoAutomatica() {
     if (modal.qtd_sugerida <= 0) { toast.error("Quantidade deve ser maior que zero."); return; }
     setGerando(true);
     try {
-      await api.pedidosCompra.create({
-        data_pedido: today(),
+      const res = await api.pedidosOrcamento.create({
+        data: today(),
         data_desejada: modal.data_entrega,
-        origem: "AUTOMATICO",
-        urgencia: urgencia(modal.produto),
-        setor_origem: "ALMOXARIFADO",
-        solicitante: "Almoxarifado (reposição automática)",
+        setor: "ALMOXARIFADO",
+        destino: `Reposição de estoque — ${modal.produto.nome}`,
+        tipo_destino: "ESTOQUE",
+        urgencia: urgencia(modal.produto) === "Crítica" ? "CRITICA" : "MEDIA",
         itens: [{
-          nome: modal.produto.nome,
-          qtd: modal.qtd_sugerida,
+          descricao: modal.produto.nome,
+          quantidade: modal.qtd_sugerida,
           unidade: modal.produto.unid,
-          preco_unit: modal.produto.preco_min ?? 0,
-          desconto: 0,
         }],
-      });
-      toast.success("Pedido de reposição gerado com sucesso!");
+      }) as { data: { numero_sc: string } };
+      toast.success(`Pedido de orçamento ${res.data?.numero_sc ?? ""} gerado com sucesso! Vai para a fila de cotação do Almoxarifado.`);
       setModal(null);
       carregar();
     } catch (err: unknown) {
@@ -81,7 +79,7 @@ export default function ReposicaoAutomatica() {
   return (
     <>
       <div className="space-y-6">
-        <PageHeader title="Reposição Automática" subtitle="Produtos com estoque crítico aguardando pedido de compra"
+        <PageHeader title="Reposição Automática" subtitle="Produtos com estoque crítico — gera Pedido de Orçamento para cotação"
           action={
             <button onClick={carregar} className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors">
               <RefreshCw size={14} /> Atualizar

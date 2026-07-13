@@ -12,7 +12,7 @@ type Urgencia    = "CRITICA" | "ALTA" | "MEDIA" | "BAIXA";
 type Status      =
   | "PENDENTE" | "COTANDO" | "AGUARDANDO_APROVACAO_MANUTENCAO" | "AGUARDANDO_APROVACAO_COMPRA"
   | "APROVADO" | "EM_TRANSITO" | "CONCLUIDO" | "REJEITADO";
-type TipoDestino = "FROTA" | "OBRA" | "EQUIPAMENTO";
+type TipoDestino = "FROTA" | "OBRA" | "EQUIPAMENTO" | "ESTOQUE";
 type TipoAcao    = "aprovar_compra" | "rejeitar" | "comprar" | "receber" | "retirar" | null;
 
 interface Item { descricao: string; quantidade: number; unidade: string; }
@@ -117,6 +117,12 @@ export default function PedidosOrcamento({ user, setor }: Props) {
   ), [nivelAdmin, user.responsabilidades]);
   const temResp = useCallback((r: ResponsabilidadePedidoOrcamento) => minhasResp.has(r), [minhasResp]);
 
+  // Pedidos do ALMOXARIFADO (Reposição Automática) não passam pela Manutenção —
+  // quem aprova o orçamento nesse caso é o aprovador de Suprimentos.
+  const podeAprovarOrcamento = useCallback((p: Pedido) =>
+    p.setor === "ALMOXARIFADO" ? temResp("aprovador_suprimentos") : temResp("aprovador_manutencao"),
+  [temResp]);
+
   // "Confirmar Recebimento" continua gated por papel/setor, como já era.
   const podeConfirmarRecebimento = papel === "op_manutencao" || papel === "admin_manutencao" || papel === "almoxarife" || papel === "admin_geral";
   // "Confirmar Retirada" é feito por quem vai buscar o material (Manutenção) — não pelo Almoxarifado, que já concluiu sua parte no recebimento.
@@ -131,7 +137,7 @@ export default function PedidosOrcamento({ user, setor }: Props) {
     if (temResp("solicitante"))           lista.push("Solicitações");
     lista.push("Recebidas");
     if (temResp("cotador"))                lista.push("Em Cotação");
-    if (temResp("aprovador_manutencao"))    lista.push("Aprovar Orçamento");
+    if (temResp("aprovador_manutencao") || temResp("aprovador_suprimentos")) lista.push("Aprovar Orçamento");
     if (temResp("aprovador_suprimentos"))   lista.push("Aprovar Compra");
     lista.push("Pendente de Compra", "Em Trânsito", "Pendente Retirada", "Concluído");
     return lista;
@@ -197,8 +203,12 @@ export default function PedidosOrcamento({ user, setor }: Props) {
     const statusFiltro = STATUS_DA_ABA[aba] ?? [];
     const base = pedidosVisiveis.filter(p => statusFiltro.includes(p.status));
     // "Pendente Retirada" é um recorte de Concluído: só os que a Manutenção ainda não retirou
-    return aba === "Pendente Retirada" ? base.filter(p => !p.retirado_por) : base;
-  }, [pedidosVisiveis, temResp, nivelAdmin, user.nome]);
+    if (aba === "Pendente Retirada") return base.filter(p => !p.retirado_por);
+    // "Aprovar Orçamento" só mostra o que a responsabilidade da pessoa cobre
+    // (ALMOXARIFADO cai pro aprovador de Suprimentos, o resto pra Manutenção)
+    if (aba === "Aprovar Orçamento") return base.filter(podeAprovarOrcamento);
+    return base;
+  }, [pedidosVisiveis, temResp, nivelAdmin, user.nome, podeAprovarOrcamento]);
 
   // Busca por frota/obra/equipamento (destino) ou nº da SC, e filtro por período
   const aplicarFiltros = useCallback((lista: Pedido[]) => {
@@ -333,7 +343,7 @@ export default function PedidosOrcamento({ user, setor }: Props) {
       acoes.push(btnDireto("Iniciar Cotação", () => api.pedidosOrcamento.iniciarCotacao(p.id), "bg-blue-600 hover:bg-blue-700"));
     if (temResp("cotador") && p.status === "COTANDO")
       acoes.push(btnComparativo("Preencher Cotação", "editar", "bg-amber-500 hover:bg-amber-600"));
-    if (temResp("aprovador_manutencao") && p.status === "AGUARDANDO_APROVACAO_MANUTENCAO") {
+    if (podeAprovarOrcamento(p) && p.status === "AGUARDANDO_APROVACAO_MANUTENCAO") {
       acoes.push(btnComparativo("Aprovar Orçamento", "aprovar", "bg-emerald-600 hover:bg-emerald-700"));
       acoes.push(btnModal("Rejeitar", "rejeitar", "bg-red-500 hover:bg-red-600"));
     }
@@ -711,7 +721,7 @@ export default function PedidosOrcamento({ user, setor }: Props) {
               {([
                 ["Solicitante", drawer.solicitante],
                 ["Destino",     drawer.destino],
-                ["Tipo",        drawer.tipo_destino === "FROTA" ? "Frota" : drawer.tipo_destino === "OBRA" ? "Obra" : "Equipamento"],
+                ["Tipo",        drawer.tipo_destino === "FROTA" ? "Frota" : drawer.tipo_destino === "OBRA" ? "Obra" : drawer.tipo_destino === "ESTOQUE" ? "Estoque (Reposição Automática)" : "Equipamento"],
                 ["Data",        fmtDate(drawer.data)],
                 ...(drawer.data_desejada ? [["Data Desejada", fmtDate(drawer.data_desejada)]] : []),
                 ...(drawer.fornecedor_escolhido ? [["Fornecedor(es) Escolhido(s)", drawer.fornecedor_escolhido]] : []),

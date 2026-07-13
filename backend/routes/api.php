@@ -147,9 +147,11 @@ Route::middleware('auth:sanctum')->group(function () {
         [PedidoOrcamentoController::class, 'enviarAprovacaoManutencao']
     )->middleware('responsabilidade:pedido_orcamento,cotador');
 
+    // A responsabilidade exigida depende do setor do pedido — checado no controller
+    // (ALMOXARIFADO não passa pela Manutenção, quem aprova é o próprio aprovador de Suprimentos).
     Route::post('/pedidos-orcamento/{pedidoOrcamento}/aprovar-manutencao',
         [PedidoOrcamentoController::class, 'aprovarManutencao']
-    )->middleware('responsabilidade:pedido_orcamento,aprovador_manutencao');
+    );
 
     Route::post('/pedidos-orcamento/{pedidoOrcamento}/rejeitar',
         [PedidoOrcamentoController::class, 'rejeitar']

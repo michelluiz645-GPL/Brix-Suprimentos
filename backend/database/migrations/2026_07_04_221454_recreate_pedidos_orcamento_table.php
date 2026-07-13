@@ -25,7 +25,7 @@ return new class extends Migration
             $table->foreignId('solicitante_id')->constrained('users')->onDelete('cascade');
 
             $table->string('destino', 150);
-            $table->enum('tipo_destino', ['FROTA', 'OBRA', 'EQUIPAMENTO'])->default('FROTA');
+            $table->enum('tipo_destino', ['FROTA', 'OBRA', 'EQUIPAMENTO', 'ESTOQUE'])->default('FROTA');
             $table->enum('urgencia', ['CRITICA', 'ALTA', 'MEDIA', 'BAIXA'])->default('MEDIA');
 
             $table->enum('status', [

@@ -87,7 +87,14 @@ class PedidoOrcamentoService
         ]);
 
         $this->avancarTimeline($pedido, $statusAnterior, $responsavel->nome);
-        $this->notificar(['admin_manutencao'], "Pedido {$pedido->numero_sc} aguardando aprovação da Manutenção.");
+
+        // ALMOXARIFADO (Reposição Automática) não passa pela Manutenção —
+        // quem precisa agir já é o próprio aprovador de Suprimentos.
+        if ($pedido->setor === 'ALMOXARIFADO') {
+            $this->notificar(['admin_suprimentos'], "Pedido {$pedido->numero_sc} aguardando sua aprovação.");
+        } else {
+            $this->notificar(['admin_manutencao'], "Pedido {$pedido->numero_sc} aguardando aprovação da Manutenção.");
+        }
     }
 
     /**
