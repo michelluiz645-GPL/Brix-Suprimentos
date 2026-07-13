@@ -47,6 +47,27 @@ class CombustivelTest extends TestCase
             ->assertJsonPath('data.data.DIESEL S10', 800);
     }
 
+    public function test_abastecimento_calcula_valor_pelo_preco_da_ultima_entrada(): void
+    {
+        $this->actingAs($this->usuario)->postJson('/api/combustiveis', [
+            'tipo' => 'ENTRADA', 'combustivel' => 'DIESEL S10', 'quantidade' => 1000,
+            'valor_litro' => 5.5, 'fornecedor' => 'Posto XYZ', 'responsavel' => 'João', 'data' => '2026-07-01',
+        ]);
+
+        // Entrada mais recente com preço diferente — o abastecimento deve usar ESTA, não a primeira.
+        $this->actingAs($this->usuario)->postJson('/api/combustiveis', [
+            'tipo' => 'ENTRADA', 'combustivel' => 'DIESEL S10', 'quantidade' => 500,
+            'valor_litro' => 6, 'fornecedor' => 'Posto ABC', 'responsavel' => 'João', 'data' => '2026-07-05',
+        ]);
+
+        $resp = $this->actingAs($this->usuario)->postJson('/api/combustiveis', [
+            'tipo' => 'ABASTECIMENTO', 'combustivel' => 'DIESEL S10', 'quantidade' => 100,
+            'frota' => 'ABC-1234', 'responsavel' => 'Carlos', 'data' => '2026-07-07',
+        ])->assertStatus(201);
+
+        $this->assertEquals(600, (float) $resp->json('data.valor')); // 100L × R$6,00
+    }
+
     public function test_nao_permite_abastecer_alem_do_saldo(): void
     {
         $this->actingAs($this->usuario)->postJson('/api/combustiveis', [

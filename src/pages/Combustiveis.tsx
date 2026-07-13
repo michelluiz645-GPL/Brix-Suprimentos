@@ -4,7 +4,7 @@ import PageHeader from "@/components/PageHeader";
 import { useToast } from "@/hooks/useToast";
 import ToastContainer from "@/components/Toast";
 import { formatCurrency, formatDate, today } from "@/utils/formatters";
-import type { FuelMovement } from "@/types";
+import type { FuelMovement, Vehicle } from "@/types";
 import { ArrowDown, ArrowUp } from "lucide-react";
 
 const COMBUSTIVEIS = ["DIESEL S500", "DIESEL S10", "GASOLINA"];
@@ -30,6 +30,7 @@ export default function Combustiveis() {
   const [tab, setTab] = useState<Tab>("historico");
   const [movimentos, setMovimentos] = useState<FuelMovement[]>([]);
   const [saldo, setSaldo] = useState<Record<string, number>>({});
+  const [veiculos, setVeiculos] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [filtroTipo, setFiltroTipo] = useState("");
@@ -50,7 +51,14 @@ export default function Combustiveis() {
     ]).catch(() => {}).finally(() => setLoading(false));
   };
 
-  useEffect(() => { carregar(); }, []);
+  useEffect(() => {
+    carregar();
+    api.veiculos.list().then((r) => {
+      const d = (r as { data: Vehicle[] }).data ?? [];
+      const lista: Vehicle[] = Array.isArray(d) ? d : Object.values(d);
+      setVeiculos(lista.filter((v) => v.status === "ATIVO"));
+    });
+  }, []);
 
   const setE = (k: keyof ReturnType<typeof emptyEntrada>) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -114,6 +122,18 @@ export default function Combustiveis() {
     } finally { setSalvando(false); }
   };
 
+  // Abastecimento não tem preço próprio — o valor é estimado aqui só pra
+  // conferência visual; o cálculo de verdade (com a entrada mais recente
+  // no momento do envio) acontece no backend.
+  const ultimoValorLitro = (combustivel: string): number => {
+    const ultimaEntrada = movimentos
+      .filter((m) => m.combustivel === combustivel && m.tipo === "ENTRADA")
+      .sort((a, b) => (a.data < b.data ? 1 : -1))[0];
+    return ultimaEntrada && Number(ultimaEntrada.quantidade) > 0
+      ? Number(ultimaEntrada.valor) / Number(ultimaEntrada.quantidade)
+      : 0;
+  };
+
   const filtered = movimentos.filter((m) => {
     if (filtroTipo && m.tipo !== filtroTipo) return false;
     if (filtroComb && m.combustivel !== filtroComb) return false;
@@ -127,13 +147,29 @@ export default function Combustiveis() {
 
         {/* KPI cards */}
         <div className="grid grid-cols-3 gap-4">
-          {COMBUSTIVEIS.map((c) => (
-            <div key={c} className="bg-white border border-slate-100 rounded-xl p-5 shadow-sm text-center">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 leading-tight">{c}</p>
-              <p className="text-3xl font-black font-mono text-slate-800">{(saldo[c] ?? 0).toFixed(0)}</p>
-              <p className="text-[10px] text-slate-400 mt-0.5">litros em estoque</p>
-            </div>
-          ))}
+          {COMBUSTIVEIS.map((c) => {
+            const litros = saldo[c] ?? 0;
+            const precoLitro = ultimoValorLitro(c);
+            const valorTotal = litros * precoLitro;
+            return (
+              <div key={c} className="bg-white border border-slate-100 rounded-xl p-5 shadow-sm text-center">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 leading-tight">{c}</p>
+                <p className="text-3xl font-black font-mono text-slate-800">{litros.toFixed(0)}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5 mb-3">litros em estoque</p>
+                <div className="border-t border-slate-100 pt-2 flex justify-between text-[11px]">
+                  <span className="text-slate-400">R$/L {precoLitro > 0 ? formatCurrency(precoLitro) : "—"}</span>
+                  <span className="font-mono font-bold text-slate-600">{formatCurrency(valorTotal)}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 flex items-center justify-between">
+          <span className="text-xs font-bold text-emerald-700">Valor total do estoque de combustíveis</span>
+          <span className="text-xl font-black font-mono text-emerald-700">
+            {formatCurrency(COMBUSTIVEIS.reduce((soma, c) => soma + (saldo[c] ?? 0) * ultimoValorLitro(c), 0))}
+          </span>
         </div>
 
         {/* Tabs */}
@@ -286,8 +322,10 @@ export default function Combustiveis() {
                   </button>
                 </div>
                 {saida.destino_tipo === "frota" ? (
-                  <input value={saida.frota} onChange={setS("frota")} placeholder="Placa ou identificação do veículo (ex: ABC-1234)"
-                    className={`${inp} font-mono uppercase`} />
+                  <select value={saida.frota} onChange={setS("frota")} className={`${inp} font-mono`}>
+                    <option value="">— Selecione o veículo —</option>
+                    {veiculos.map((v) => <option key={v.id} value={v.placa}>{v.placa} — {v.modelo}</option>)}
+                  </select>
                 ) : (
                   <input value={saida.outros} onChange={setS("outros")} placeholder="Descreva o destino (ex: gerador, equipamento, obra...)"
                     className={inp} />
@@ -303,6 +341,14 @@ export default function Combustiveis() {
                 <input type="date" value={saida.data} onChange={setS("data")} className={inp} />
               </div>
             </div>
+
+            {/* Valor estimado (calculado de verdade no servidor, pelo preço da última entrada) */}
+            {saida.quantidade > 0 && ultimoValorLitro(saida.combustivel) > 0 && (
+              <div className="bg-sky-50 border border-sky-100 rounded-xl p-4 flex items-center justify-between">
+                <span className="text-xs font-bold text-sky-700">Valor estimado (preço da última entrada)</span>
+                <span className="text-xl font-black font-mono text-sky-700">{formatCurrency(saida.quantidade * ultimoValorLitro(saida.combustivel))}</span>
+              </div>
+            )}
 
             <div className="flex justify-end pt-2">
               <button type="submit" disabled={salvando}

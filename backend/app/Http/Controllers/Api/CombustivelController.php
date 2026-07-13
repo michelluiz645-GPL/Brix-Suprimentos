@@ -39,6 +39,10 @@ class CombustivelController extends Controller
                     'message' => "Saldo insuficiente de {$dados['combustivel']} — disponível: {$saldo}L.",
                 ], 422);
             }
+
+            // Abastecimento não tem preço próprio — usa o valor/litro da
+            // última entrada desse combustível pra calcular o valor consumido.
+            $dados['valor'] = $dados['quantidade'] * $this->ultimoValorLitro($dados['combustivel']);
         }
 
         $movimento = CombustivelMovimento::create([
@@ -62,5 +66,17 @@ class CombustivelController extends Controller
         $saidas   = CombustivelMovimento::where('combustivel', $combustivel)->where('tipo', 'ABASTECIMENTO')->sum('quantidade');
 
         return (float) $entradas - (float) $saidas;
+    }
+
+    private function ultimoValorLitro(string $combustivel): float
+    {
+        $ultimaEntrada = CombustivelMovimento::where('combustivel', $combustivel)->where('tipo', 'ENTRADA')
+            ->orderByDesc('data')->orderByDesc('id')->first();
+
+        if (! $ultimaEntrada || (float) $ultimaEntrada->quantidade <= 0) {
+            return 0;
+        }
+
+        return (float) $ultimaEntrada->valor / (float) $ultimaEntrada->quantidade;
     }
 }
