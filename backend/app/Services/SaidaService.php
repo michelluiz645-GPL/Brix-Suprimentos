@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\DebitoManutencao;
 use App\Models\EpiRegistro;
+use App\Models\Equipe;
 use App\Models\Movimento;
 use App\Models\Numerador;
 use App\Models\ProdutoVariacao;
@@ -31,6 +33,11 @@ class SaidaService
         }
 
         $numeroPedido = $this->gerarNumero();
+
+        // RF-025 — equipe do tipo Manutenção também gera débito automático,
+        // além de qualquer item cujo destino seja Frota ou Manutenção.
+        $equipeManutencao = Equipe::where('numero', $dados['equipe'])->value('tipo') === 'Manutenção';
+        $itensDebito = [];
 
         foreach ($dados['itens'] as $i => $item) {
             $variacoes[$i]->decrement('estoque', $item['qtd']);
@@ -81,6 +88,32 @@ class SaidaService
                     'registrado_por' => $usuario->nome,
                 ]);
             }
+
+            // EPI nunca entra no débito, mesmo saindo pra frota/manutenção.
+            $geraDebito = ! $isEpi && ($item['destino'] === 'Frota' || $item['destino'] === 'Manutenção' || $equipeManutencao);
+            if ($geraDebito) {
+                $itensDebito[] = [
+                    'nome' => $nomeItem, 'qtd' => $item['qtd'], 'unid' => $item['unid'] ?? '',
+                    'preco' => (float) ($item['preco'] ?? $variacoes[$i]->preco),
+                    'destino_frota' => $item['destino_frota'] ?? null,
+                ];
+            }
+        }
+
+        if (! empty($itensDebito)) {
+            DebitoManutencao::create([
+                'numero'         => $this->gerarNumeroDebito(),
+                'pedido_origem'  => $numeroPedido,
+                'data'           => $dados['data'],
+                'equipe'         => $dados['equipe'],
+                'nome_equipe'    => $dados['nome_equipe'] ?? $dados['equipe'],
+                'colaborador'    => $dados['colaborador'] ?? null,
+                'almoxarifado'   => $dados['almoxarifado'],
+                'registrado_por' => $usuario->nome,
+                'itens'          => $itensDebito,
+                'total'          => collect($itensDebito)->sum(fn ($i) => $i['qtd'] * $i['preco']),
+                'status'         => 'ABERTO',
+            ]);
         }
 
         return $numeroPedido;
@@ -109,6 +142,22 @@ class SaidaService
     {
         $ano   = date('Y');
         $chave = "MOV-SAÍDA-{$ano}";
+
+        $numerador = Numerador::lockForUpdate()->firstOrCreate(
+            ['chave' => $chave],
+            ['ultimo' => 0]
+        );
+
+        $numerador->increment('ultimo');
+        $numerador->refresh();
+
+        return sprintf('%s-%04d', $chave, $numerador->ultimo);
+    }
+
+    private function gerarNumeroDebito(): string
+    {
+        $ano   = date('Y');
+        $chave = "DEB-{$ano}";
 
         $numerador = Numerador::lockForUpdate()->firstOrCreate(
             ['chave' => $chave],

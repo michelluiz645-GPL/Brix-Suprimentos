@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Equipe;
 use App\Models\Produto;
 use App\Models\ProdutoVariacao;
 use App\Models\Setor;
@@ -18,6 +19,8 @@ class SaidaTest extends TestCase
     private User $admin;
     private Produto $produto;
     private ProdutoVariacao $variacao;
+    private Produto $produtoPeca;
+    private ProdutoVariacao $variacaoPeca;
 
     protected function setUp(): void
     {
@@ -39,6 +42,11 @@ class SaidaTest extends TestCase
             'dias_validade_epi' => 90,
         ]);
         $this->variacao = $this->produto->variacoes()->create(['marca' => '3M', 'preco' => 10, 'estoque' => 20]);
+
+        $this->produtoPeca = Produto::create([
+            'codigo_produto' => 'PEC-001', 'nome' => 'Filtro de Óleo', 'categoria' => 'Peças Motor', 'unid' => 'UNID',
+        ]);
+        $this->variacaoPeca = $this->produtoPeca->variacoes()->create(['marca' => 'Fram', 'preco' => 45, 'estoque' => 20]);
     }
 
     private function payloadSaida(int $qtd): array
@@ -140,5 +148,62 @@ class SaidaTest extends TestCase
         $this->actingAs($this->admin)
             ->postJson("/api/saidas/cupons/{$numeroPedido}/cancelar")
             ->assertStatus(422);
+    }
+
+    private function payloadPeca(string $destino, int $qtd = 2): array
+    {
+        return [
+            'tipo' => 'SAÍDA', 'tipo_saida' => 'Retirada', 'equipe' => 'Equipe 01', 'colaborador' => 'Pedro',
+            'entregador' => 'João', 'resp_almox' => 'Maria', 'almoxarifado' => 'Almox Central', 'data' => '2026-07-07',
+            'itens' => [['codigo' => 'PEC-001', 'variacao_id' => $this->variacaoPeca->id, 'nome' => 'Filtro de Óleo', 'unid' => 'UNID', 'qtd' => $qtd, 'destino' => $destino]],
+        ];
+    }
+
+    public function test_saida_com_destino_frota_gera_debito_automatico(): void
+    {
+        $payload = $this->payloadPeca('Frota');
+        $payload['itens'][0]['destino_frota'] = 'ABC-1234';
+
+        $numeroPedido = $this->actingAs($this->operador)->postJson('/api/saidas', $payload)->json('data.numero_pedido');
+
+        $debito = \App\Models\DebitoManutencao::firstOrFail();
+        $this->assertSame($numeroPedido, $debito->pedido_origem);
+        $this->assertSame('ABERTO', $debito->status);
+        $this->assertEquals(90, (float) $debito->total); // 2 × R$45
+        $this->assertCount(1, $debito->itens);
+    }
+
+    public function test_saida_com_destino_manutencao_gera_debito_automatico(): void
+    {
+        $this->actingAs($this->operador)->postJson('/api/saidas', $this->payloadPeca('Manutenção'));
+
+        $this->assertSame(1, \App\Models\DebitoManutencao::count());
+    }
+
+    public function test_saida_com_destino_outro_nao_gera_debito(): void
+    {
+        $this->actingAs($this->operador)->postJson('/api/saidas', $this->payloadPeca('Roçada'));
+
+        $this->assertSame(0, \App\Models\DebitoManutencao::count());
+    }
+
+    public function test_equipe_tipo_manutencao_gera_debito_mesmo_com_outro_destino(): void
+    {
+        Equipe::create(['nome' => 'Equipe Manutenção 01', 'numero' => 'Equipe 01', 'tipo' => 'Manutenção']);
+
+        $this->actingAs($this->operador)->postJson('/api/saidas', $this->payloadPeca('Para a Equipe'));
+
+        $this->assertSame(1, \App\Models\DebitoManutencao::count());
+    }
+
+    public function test_item_epi_nunca_entra_no_debito(): void
+    {
+        $payload = $this->payloadSaida(1); // produto EPI
+        $payload['itens'][0]['destino'] = 'Frota';
+        $payload['itens'][0]['destino_frota'] = 'ABC-1234';
+
+        $this->actingAs($this->operador)->postJson('/api/saidas', $payload)->assertStatus(201);
+
+        $this->assertSame(0, \App\Models\DebitoManutencao::count(), 'Item EPI não deve gerar débito mesmo saindo para Frota.');
     }
 }
