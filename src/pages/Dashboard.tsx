@@ -3,6 +3,7 @@ import api from "@/services/api";
 import KPICard from "@/components/KPICard";
 import { formatCurrency } from "@/utils/formatters";
 import type { User } from "@/types";
+import { Search } from "lucide-react";
 
 interface DashboardProps {
   user: User;
@@ -18,6 +19,7 @@ export default function Dashboard({ user, setor, setActivePage }: DashboardProps
   const [purchases, setPurchases]     = useState<Record<string, object>>({});
   const [dbStatus, setDbStatus]       = useState({ connected: false, message: "" });
   const [filterType, setFilterType]   = useState("Todos");
+  const [searchTerm, setSearchTerm]   = useState("");
   const [linesCount, setLinesCount]   = useState(20);
   const [loading, setLoading]         = useState(true);
 
@@ -59,9 +61,15 @@ export default function Dashboard({ user, setor, setActivePage }: DashboardProps
   const pendDelivs    = delivList.filter((d) => d.status === "PENDENTE").length;
   const pendPurchases = purchList.filter((p) => p.status !== "CONCLUÍDO" && p.status !== "CANCELADO").length;
 
+  const busca = searchTerm.trim().toLowerCase();
   const filteredMovs = movList
     .sort((a, b) => String(b.data).localeCompare(String(a.data)))
     .filter((m) => filterType === "Todos" || m.tipo === filterType)
+    .filter((m) => {
+      if (!busca) return true;
+      const campos = [m.nome, m.codigo, m.destino, m.destino_frota, m.nome_equipe, m.equipe];
+      return campos.some((c) => String(c ?? "").toLowerCase().includes(busca));
+    })
     .slice(0, linesCount);
 
   if (loading) {
@@ -144,6 +152,11 @@ export default function Dashboard({ user, setor, setActivePage }: DashboardProps
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Últimos Movimentos</h3>
           <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Buscar item, equipe ou frota..."
+                className="pl-8 pr-3 py-2 text-xs bg-slate-100 border border-slate-200 rounded-lg focus:outline-none w-56" />
+            </div>
             <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="bg-slate-100 border border-slate-200 rounded-lg px-3 py-2 text-xs font-semibold focus:outline-none">
               <option value="Todos">Todos</option>
               <option value="ENTRADA">Entradas</option>
@@ -186,7 +199,11 @@ export default function Dashboard({ user, setor, setActivePage }: DashboardProps
                       <td className="p-3 font-semibold text-slate-700">{String(m.nome ?? "—")}</td>
                       <td className="p-3 text-center font-bold text-slate-600">{`${m.qtd} ${m.unid}`}</td>
                       <td className="p-3 font-semibold text-slate-700">{formatCurrency(Number(m.preco ?? 0))}</td>
-                      <td className="p-3 text-slate-500">{String(m.destino ?? m.nome_equipe ?? m.equipe ?? "—")}</td>
+                      <td className="p-3 text-slate-500">
+                        {m.destino === "Frota" && m.destino_frota
+                          ? String(m.destino_frota)
+                          : String(m.destino ?? m.nome_equipe ?? m.equipe ?? "—")}
+                      </td>
                       <td className="p-3 text-slate-500">{String(m.resp_almox ?? m.responsavel ?? "—")}</td>
                     </tr>
                   );
