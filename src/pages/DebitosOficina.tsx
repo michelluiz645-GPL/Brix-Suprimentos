@@ -19,7 +19,6 @@ const emptyForm = () => ({
 export default function DebitosOficina() {
   const toast = useToast();
   const [debitos, setDebitos] = useState<MaintenanceDebit[]>([]);
-  const [gastoEpi, setGastoEpi] = useState(0);
   const [loading, setLoading] = useState(true);
   const [filtroStatus, setFiltroStatus] = useState("");
   const [filtroEquipe, setFiltroEquipe] = useState("");
@@ -39,10 +38,8 @@ export default function DebitosOficina() {
     if (filtroDataAte) query.set("data_ate", filtroDataAte);
     const params = query.toString() || undefined;
     api.debitos.list(params).then((r) => {
-      const resp = r as { data: MaintenanceDebit[]; gasto_epi?: number };
-      const d = resp.data ?? [];
+      const d = (r as { data: MaintenanceDebit[] }).data ?? [];
       setDebitos(Array.isArray(d) ? d : Object.values(d));
-      setGastoEpi(resp.gasto_epi ?? 0);
     }).catch(() => toast.error("Não foi possível carregar os débitos."))
       .finally(() => setLoading(false));
   };
@@ -90,16 +87,21 @@ export default function DebitosOficina() {
     !filtroEquipe || (d.equipe || d.nome_equipe || "").toLowerCase().includes(filtroEquipe.toLowerCase())
   );
 
+  // RF-025 — EPI nunca é cobrado da equipe: não entra no que está em
+  // aberto/pago, só no Total Geral (visão de gasto, não de dívida).
   // d.total vem do backend com cast decimal:2 do Laravel, que serializa como
   // string ("95.00") — Number() garante soma numérica de verdade, não concatenação.
-  const totalAberto = debitos.filter((d) => d.status === "ABERTO").reduce((s, d) => s + Number(d.total), 0);
-  const totalPago = debitos.filter((d) => d.status === "PAGO").reduce((s, d) => s + Number(d.total), 0);
-  const totalGeral = totalAberto + totalPago + Number(gastoEpi);
+  const materiais = debitos.filter((d) => d.natureza !== "EPI");
+  const debitosEpi = debitos.filter((d) => d.natureza === "EPI");
+  const totalAberto = materiais.filter((d) => d.status === "ABERTO").reduce((s, d) => s + Number(d.total), 0);
+  const totalPago = materiais.filter((d) => d.status === "PAGO").reduce((s, d) => s + Number(d.total), 0);
+  const gastoEpi = debitosEpi.reduce((s, d) => s + Number(d.total), 0);
+  const totalGeral = totalAberto + totalPago + gastoEpi;
 
-  // Gasto por categoria (Peças Motor, Óleos, Ferramentas...) — soma todos os
-  // débitos independente do status, pra dar visão geral de onde o dinheiro
-  // está indo. Itens de débitos lançados manualmente (sem produto vinculado)
-  // caem em "Outros".
+  // Gasto por categoria (Peças Motor, Óleos, Ferramentas, EPI...) — soma
+  // todos os débitos (inclusive EPI) independente do status, pra dar visão
+  // geral de onde o dinheiro está indo. Itens de débitos lançados
+  // manualmente (sem produto vinculado) caem em "Outros".
   const porCategoria = debitos
     .flatMap((d) => d.itens ?? [])
     .reduce<Record<string, number>>((acc, it) => {
@@ -134,22 +136,20 @@ export default function DebitosOficina() {
           </div>
         </div>
 
-        {(categoriasOrdenadas.length > 0 || gastoEpi > 0) && (
+        {categoriasOrdenadas.length > 0 && (
           <div>
             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Gasto por categoria</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              {categoriasOrdenadas.map(([cat, valor]) => (
-                <div key={cat} className="bg-white border border-slate-100 rounded-xl p-3 shadow-sm">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 truncate" title={cat}>{cat}</p>
-                  <p className="text-base font-black font-mono text-slate-700">{formatCurrency(valor)}</p>
-                </div>
-              ))}
-              {gastoEpi > 0 && (
-                <div className="bg-amber-50 border border-amber-100 rounded-xl p-3" title="EPI é equipamento de segurança obrigatório — não é cobrado de nenhuma equipe específica, mas conta no Total Geral.">
-                  <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-1">EPI</p>
-                  <p className="text-base font-black font-mono text-amber-700">{formatCurrency(gastoEpi)}</p>
-                </div>
-              )}
+              {categoriasOrdenadas.map(([cat, valor]) => {
+                const isEpi = cat === "EPI";
+                return (
+                  <div key={cat} className={`border rounded-xl p-3 shadow-sm ${isEpi ? "bg-amber-50 border-amber-100" : "bg-white border-slate-100"}`}
+                    title={isEpi ? "EPI é equipamento de segurança obrigatório — não é cobrado de nenhuma equipe específica, mas conta no Total Geral." : undefined}>
+                    <p className={`text-[10px] font-bold uppercase tracking-widest mb-1 truncate ${isEpi ? "text-amber-600" : "text-slate-500"}`} title={cat}>{cat}</p>
+                    <p className={`text-base font-black font-mono ${isEpi ? "text-amber-700" : "text-slate-700"}`}>{formatCurrency(valor)}</p>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -194,31 +194,40 @@ export default function DebitosOficina() {
                 ))}
               </tr></thead>
               <tbody className="divide-y divide-slate-50">
-                {filtered.map((d) => (
-                  <tr key={d.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="p-3 font-mono font-bold text-[#EA6C0A]">{d.numero || `#${d.id}`}</td>
-                    <td className="p-3 text-slate-500">{formatDate(d.data)}</td>
-                    <td className="p-3 font-medium">{d.nome_equipe || d.equipe}</td>
-                    <td className="p-3 text-slate-500">{d.colaborador || "—"}</td>
-                    <td className="p-3 text-slate-500">{d.almoxarifado || "—"}</td>
-                    <td className="p-3 font-mono font-bold text-slate-700">{formatCurrency(d.total)}</td>
-                    <td className="p-3">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${d.status === "ABERTO" ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"}`}>
-                        {d.status}
-                      </span>
-                    </td>
-                    <td className="p-3">
-                      <div className="flex gap-2">
-                        <button onClick={() => setSel(d)} className="text-slate-400 hover:text-[#EA6C0A] transition-colors"><Eye size={14} /></button>
-                        {d.status === "ABERTO" && d.id && (
-                          <button onClick={() => marcarPago(d.id!)} className="text-slate-400 hover:text-emerald-600 transition-colors" title="Marcar como pago">
-                            <CheckCircle size={14} />
-                          </button>
+                {filtered.map((d) => {
+                  const isEpi = d.natureza === "EPI";
+                  return (
+                    <tr key={d.id} className={`transition-colors ${isEpi ? "bg-amber-50/30 hover:bg-amber-50/60" : "hover:bg-slate-50"}`}>
+                      <td className="p-3 font-mono font-bold text-[#EA6C0A]">{d.numero || `#${d.id}`}</td>
+                      <td className="p-3 text-slate-500">{formatDate(d.data)}</td>
+                      <td className="p-3 font-medium">{d.nome_equipe || d.equipe}</td>
+                      <td className="p-3 text-slate-500">{d.colaborador || "—"}</td>
+                      <td className="p-3 text-slate-500">{d.almoxarifado || "—"}</td>
+                      <td className="p-3 font-mono font-bold text-slate-700">{formatCurrency(d.total)}</td>
+                      <td className="p-3">
+                        {isEpi ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700" title="EPI — item de segurança obrigatório, não cobrado da equipe">
+                            EPI (informativo)
+                          </span>
+                        ) : (
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${d.status === "ABERTO" ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"}`}>
+                            {d.status}
+                          </span>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="p-3">
+                        <div className="flex gap-2">
+                          <button onClick={() => setSel(d)} className="text-slate-400 hover:text-[#EA6C0A] transition-colors"><Eye size={14} /></button>
+                          {!isEpi && d.status === "ABERTO" && d.id && (
+                            <button onClick={() => marcarPago(d.id!)} className="text-slate-400 hover:text-emerald-600 transition-colors" title="Marcar como pago">
+                              <CheckCircle size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
@@ -234,7 +243,11 @@ export default function DebitosOficina() {
                 <h2 className="text-sm font-bold text-slate-800">Débito {sel.numero || `#${sel.id}`}</h2>
                 <p className="text-xs text-slate-400 mt-0.5">{formatDate(sel.data)} — {sel.nome_equipe || sel.equipe}</p>
               </div>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${sel.status === "ABERTO" ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"}`}>{sel.status}</span>
+              {sel.natureza === "EPI" ? (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">EPI (informativo)</span>
+              ) : (
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${sel.status === "ABERTO" ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"}`}>{sel.status}</span>
+              )}
             </div>
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-3 text-xs">
@@ -273,7 +286,7 @@ export default function DebitosOficina() {
               </table>
             </div>
             <div className="p-6 border-t border-slate-100 flex justify-between">
-              {sel.status === "ABERTO" && sel.id && (
+              {sel.natureza !== "EPI" && sel.status === "ABERTO" && sel.id && (
                 <button onClick={() => { marcarPago(sel.id!); setSel(null); }}
                   className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-emerald-500 rounded-lg hover:bg-emerald-600 transition-colors">
                   <CheckCircle size={13} /> Marcar como Pago

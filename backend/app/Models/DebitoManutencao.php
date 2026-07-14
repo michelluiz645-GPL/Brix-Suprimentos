@@ -13,7 +13,7 @@ class DebitoManutencao extends Model
 
     protected $fillable = [
         'numero', 'pedido_origem', 'data', 'equipe', 'nome_equipe', 'colaborador',
-        'almoxarifado', 'itens', 'total', 'status', 'registrado_por', 'data_pagamento',
+        'almoxarifado', 'itens', 'natureza', 'total', 'status', 'registrado_por', 'data_pagamento',
     ];
 
     protected $casts = [

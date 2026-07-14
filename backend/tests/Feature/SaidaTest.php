@@ -197,7 +197,7 @@ class SaidaTest extends TestCase
         $this->assertSame(1, \App\Models\DebitoManutencao::count());
     }
 
-    public function test_item_epi_nunca_entra_no_debito(): void
+    public function test_item_epi_gera_debito_separado_com_natureza_epi_e_nao_material(): void
     {
         $payload = $this->payloadSaida(1); // produto EPI
         $payload['itens'][0]['destino'] = 'Frota';
@@ -205,6 +205,17 @@ class SaidaTest extends TestCase
 
         $this->actingAs($this->operador)->postJson('/api/saidas', $payload)->assertStatus(201);
 
-        $this->assertSame(0, \App\Models\DebitoManutencao::count(), 'Item EPI não deve gerar débito mesmo saindo para Frota.');
+        $this->assertSame(0, \App\Models\DebitoManutencao::where('natureza', 'MATERIAL')->count(), 'EPI não pode virar débito cobrado (MATERIAL).');
+
+        $debitoEpi = \App\Models\DebitoManutencao::where('natureza', 'EPI')->firstOrFail();
+        $this->assertEquals(10, (float) $debitoEpi->total); // 1 × R$10
+        $this->assertSame('EPI', $debitoEpi->itens[0]['categoria']);
+    }
+
+    public function test_item_epi_sem_destino_elegivel_nao_gera_nenhum_debito(): void
+    {
+        $this->actingAs($this->operador)->postJson('/api/saidas', $this->payloadSaida(1))->assertStatus(201);
+
+        $this->assertSame(0, \App\Models\DebitoManutencao::count(), 'Sem destino Frota/Manutenção, nem o registro informativo de EPI deve ser criado.');
     }
 }

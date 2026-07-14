@@ -38,6 +38,7 @@ class SaidaService
         // além de qualquer item cujo destino seja Frota ou Manutenção.
         $equipeManutencao = Equipe::where('numero', $dados['equipe'])->value('tipo') === 'Manutenção';
         $itensDebito = [];
+        $itensDebitoEpi = [];
 
         foreach ($dados['itens'] as $i => $item) {
             $variacoes[$i]->decrement('estoque', $item['qtd']);
@@ -89,35 +90,50 @@ class SaidaService
                 ]);
             }
 
-            // EPI nunca entra no débito, mesmo saindo pra frota/manutenção.
-            $geraDebito = ! $isEpi && ($item['destino'] === 'Frota' || $item['destino'] === 'Manutenção' || $equipeManutencao);
-            if ($geraDebito) {
-                $itensDebito[] = [
+            $elegivel = $item['destino'] === 'Frota' || $item['destino'] === 'Manutenção' || $equipeManutencao;
+            if ($elegivel) {
+                $itemDebito = [
                     'nome' => $nomeItem, 'qtd' => $item['qtd'], 'unid' => $item['unid'] ?? '',
                     'preco' => (float) ($item['preco'] ?? $variacoes[$i]->preco),
                     'destino_frota' => $item['destino_frota'] ?? null,
                     'categoria' => $produto?->categoria,
                 ];
+                // EPI nunca é cobrado da equipe, mas ganha sua própria linha
+                // no histórico (natureza EPI), separada do débito de verdade.
+                if ($isEpi) {
+                    $itensDebitoEpi[] = $itemDebito;
+                } else {
+                    $itensDebito[] = $itemDebito;
+                }
             }
         }
 
-        if (! empty($itensDebito)) {
-            DebitoManutencao::create([
-                'numero'         => $this->gerarNumeroDebito(),
-                'pedido_origem'  => $numeroPedido,
-                'data'           => $dados['data'],
-                'equipe'         => $dados['equipe'],
-                'nome_equipe'    => $dados['nome_equipe'] ?? $dados['equipe'],
-                'colaborador'    => $dados['colaborador'] ?? null,
-                'almoxarifado'   => $dados['almoxarifado'],
-                'registrado_por' => $usuario->nome,
-                'itens'          => $itensDebito,
-                'total'          => collect($itensDebito)->sum(fn ($i) => $i['qtd'] * $i['preco']),
-                'status'         => 'ABERTO',
-            ]);
-        }
+        $this->criarDebito($itensDebito, 'MATERIAL', $dados, $usuario, $numeroPedido);
+        $this->criarDebito($itensDebitoEpi, 'EPI', $dados, $usuario, $numeroPedido);
 
         return $numeroPedido;
+    }
+
+    private function criarDebito(array $itens, string $natureza, array $dados, User $usuario, string $numeroPedido): void
+    {
+        if (empty($itens)) {
+            return;
+        }
+
+        DebitoManutencao::create([
+            'numero'         => $this->gerarNumeroDebito(),
+            'pedido_origem'  => $numeroPedido,
+            'data'           => $dados['data'],
+            'equipe'         => $dados['equipe'],
+            'nome_equipe'    => $dados['nome_equipe'] ?? $dados['equipe'],
+            'colaborador'    => $dados['colaborador'] ?? null,
+            'almoxarifado'   => $dados['almoxarifado'],
+            'registrado_por' => $usuario->nome,
+            'itens'          => $itens,
+            'natureza'       => $natureza,
+            'total'          => collect($itens)->sum(fn ($i) => $i['qtd'] * $i['preco']),
+            'status'         => 'ABERTO',
+        ]);
     }
 
     /**

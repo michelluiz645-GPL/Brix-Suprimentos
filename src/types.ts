@@ -282,6 +282,7 @@ export interface MaintenanceDebit {
   colaborador: string;
   almoxarifado: string;
   itens: DeliveryItem[];
+  natureza?: "MATERIAL" | "EPI" | string;
   total: number;
   status: "ABERTO" | "PAGO" | string;
   registrado_por: string;
