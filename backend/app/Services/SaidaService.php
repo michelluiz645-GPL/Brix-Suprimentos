@@ -96,6 +96,7 @@ class SaidaService
                     'nome' => $nomeItem, 'qtd' => $item['qtd'], 'unid' => $item['unid'] ?? '',
                     'preco' => (float) ($item['preco'] ?? $variacoes[$i]->preco),
                     'destino_frota' => $item['destino_frota'] ?? null,
+                    'categoria' => $produto?->categoria,
                 ];
             }
         }

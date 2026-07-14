@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Produto;
 use App\Models\Setor;
 use App\Models\User;
 use Database\Seeders\SetorSeeder;
@@ -66,5 +67,55 @@ class DebitoManutencaoTest extends TestCase
         $this->actingAs($this->admin)
             ->patchJson("/api/debitos/{$id}/pagar")
             ->assertStatus(422);
+    }
+
+    public function test_gasto_epi_aparece_separado_e_nao_entra_no_total_devido(): void
+    {
+        $produto = Produto::create([
+            'codigo_produto' => 'LUV-001', 'nome' => 'Luva de Proteção', 'categoria' => 'EPI', 'unid' => 'UNID',
+        ]);
+        $variacao = $produto->variacoes()->create(['marca' => '3M', 'preco' => 15, 'estoque' => 20]);
+
+        $this->actingAs($this->operador)->postJson('/api/saidas', [
+            'tipo' => 'SAÍDA', 'tipo_saida' => 'Retirada', 'equipe' => 'Equipe 01', 'colaborador' => 'Pedro',
+            'entregador' => 'João', 'resp_almox' => 'Maria', 'almoxarifado' => 'Almox Central', 'data' => '2026-07-14',
+            'itens' => [['codigo' => 'LUV-001', 'variacao_id' => $variacao->id, 'nome' => 'Luva de Proteção', 'unid' => 'UNID', 'qtd' => 2, 'destino' => 'Manutenção', 'colaborador_epi' => 'Carlos']],
+        ])->assertStatus(201);
+
+        $resp = $this->actingAs($this->operador)->getJson('/api/debitos')->json('data');
+
+        $this->assertSame(0, $resp['total'], 'EPI não deve gerar nenhum débito cobrado.');
+        $this->assertEquals(30, $resp['gasto_epi']); // 2 × R$15
+    }
+
+    public function test_filtro_de_periodo_afeta_debitos_e_gasto_epi_igualmente(): void
+    {
+        $produto = Produto::create([
+            'codigo_produto' => 'LUV-002', 'nome' => 'Óculos de Proteção', 'categoria' => 'EPI', 'unid' => 'UNID',
+        ]);
+        $variacao = $produto->variacoes()->create(['marca' => '3M', 'preco' => 10, 'estoque' => 20]);
+
+        // Um débito e uma saída de EPI dentro do período, outro par fora.
+        $this->actingAs($this->operador)->postJson('/api/debitos', [
+            'data' => '2026-06-01', 'equipe' => '01', 'registrado_por' => 'Carlos',
+            'itens' => [['nome' => 'Óleo', 'qtd' => 1, 'unid' => 'L', 'preco' => 100]],
+        ]);
+        $this->actingAs($this->operador)->postJson('/api/debitos', [
+            'data' => '2026-07-15', 'equipe' => '01', 'registrado_por' => 'Carlos',
+            'itens' => [['nome' => 'Óleo', 'qtd' => 1, 'unid' => 'L', 'preco' => 50]],
+        ]);
+
+        $this->actingAs($this->operador)->postJson('/api/saidas', [
+            'tipo' => 'SAÍDA', 'tipo_saida' => 'Retirada', 'equipe' => 'Equipe 01', 'colaborador' => 'Pedro',
+            'entregador' => 'João', 'resp_almox' => 'Maria', 'almoxarifado' => 'Almox Central', 'data' => '2026-06-01',
+            'itens' => [['codigo' => 'LUV-002', 'variacao_id' => $variacao->id, 'nome' => 'Óculos de Proteção', 'unid' => 'UNID', 'qtd' => 1, 'destino' => 'Para a Equipe', 'colaborador_epi' => 'Carlos']],
+        ]);
+
+        $resp = $this->actingAs($this->operador)
+            ->getJson('/api/debitos?data_de=2026-07-01&data_ate=2026-07-31')
+            ->json('data');
+
+        $this->assertSame(1, $resp['total'], 'Só o débito de julho deve entrar no período filtrado.');
+        $this->assertEquals(0, $resp['gasto_epi'], 'A saída de EPI foi em junho, fora do período — não deve contar.');
     }
 }

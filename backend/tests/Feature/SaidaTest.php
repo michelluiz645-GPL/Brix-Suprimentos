@@ -171,6 +171,7 @@ class SaidaTest extends TestCase
         $this->assertSame('ABERTO', $debito->status);
         $this->assertEquals(90, (float) $debito->total); // 2 × R$45
         $this->assertCount(1, $debito->itens);
+        $this->assertSame('Peças Motor', $debito->itens[0]['categoria']);
     }
 
     public function test_saida_com_destino_manutencao_gera_debito_automatico(): void

@@ -19,9 +19,12 @@ const emptyForm = () => ({
 export default function DebitosOficina() {
   const toast = useToast();
   const [debitos, setDebitos] = useState<MaintenanceDebit[]>([]);
+  const [gastoEpi, setGastoEpi] = useState(0);
   const [loading, setLoading] = useState(true);
   const [filtroStatus, setFiltroStatus] = useState("");
   const [filtroEquipe, setFiltroEquipe] = useState("");
+  const [filtroDataDe, setFiltroDataDe] = useState("");
+  const [filtroDataAte, setFiltroDataAte] = useState("");
   const [sel, setSel] = useState<MaintenanceDebit | null>(null);
   const [criando, setCriando] = useState(false);
   const [salvando, setSalvando] = useState(false);
@@ -30,15 +33,21 @@ export default function DebitosOficina() {
 
   const carregar = () => {
     setLoading(true);
-    const params = filtroStatus ? `status=${filtroStatus}` : undefined;
+    const query = new URLSearchParams();
+    if (filtroStatus) query.set("status", filtroStatus);
+    if (filtroDataDe) query.set("data_de", filtroDataDe);
+    if (filtroDataAte) query.set("data_ate", filtroDataAte);
+    const params = query.toString() || undefined;
     api.debitos.list(params).then((r) => {
-      const d = (r as { data: MaintenanceDebit[] }).data ?? [];
+      const resp = r as { data: MaintenanceDebit[]; gasto_epi?: number };
+      const d = resp.data ?? [];
       setDebitos(Array.isArray(d) ? d : Object.values(d));
+      setGastoEpi(resp.gasto_epi ?? 0);
     }).catch(() => toast.error("Não foi possível carregar os débitos."))
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { carregar(); }, [filtroStatus]);
+  useEffect(() => { carregar(); }, [filtroStatus, filtroDataDe, filtroDataAte]);
 
   const totalDebito = (itens: DeliveryItem[]) =>
     itens.reduce((s, it) => s + it.qtd * it.preco, 0);
@@ -81,8 +90,24 @@ export default function DebitosOficina() {
     !filtroEquipe || (d.equipe || d.nome_equipe || "").toLowerCase().includes(filtroEquipe.toLowerCase())
   );
 
-  const totalAberto = debitos.filter((d) => d.status === "ABERTO").reduce((s, d) => s + d.total, 0);
-  const totalPago = debitos.filter((d) => d.status === "PAGO").reduce((s, d) => s + d.total, 0);
+  // d.total vem do backend com cast decimal:2 do Laravel, que serializa como
+  // string ("95.00") — Number() garante soma numérica de verdade, não concatenação.
+  const totalAberto = debitos.filter((d) => d.status === "ABERTO").reduce((s, d) => s + Number(d.total), 0);
+  const totalPago = debitos.filter((d) => d.status === "PAGO").reduce((s, d) => s + Number(d.total), 0);
+  const totalGeral = totalAberto + totalPago + Number(gastoEpi);
+
+  // Gasto por categoria (Peças Motor, Óleos, Ferramentas...) — soma todos os
+  // débitos independente do status, pra dar visão geral de onde o dinheiro
+  // está indo. Itens de débitos lançados manualmente (sem produto vinculado)
+  // caem em "Outros".
+  const porCategoria = debitos
+    .flatMap((d) => d.itens ?? [])
+    .reduce<Record<string, number>>((acc, it) => {
+      const cat = it.categoria || "Outros";
+      acc[cat] = (acc[cat] ?? 0) + it.qtd * it.preco;
+      return acc;
+    }, {});
+  const categoriasOrdenadas = Object.entries(porCategoria).sort((a, b) => b[1] - a[1]);
 
   return (
     <>
@@ -94,7 +119,7 @@ export default function DebitosOficina() {
             </button>
           } />
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <div className="bg-rose-50 border border-rose-100 rounded-xl p-4">
             <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest mb-1">Total em Aberto</p>
             <p className="text-2xl font-black font-mono text-rose-600">{formatCurrency(totalAberto)}</p>
@@ -103,7 +128,31 @@ export default function DebitosOficina() {
             <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">Total Pago</p>
             <p className="text-2xl font-black font-mono text-emerald-600">{formatCurrency(totalPago)}</p>
           </div>
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4" title="Débitos (Aberto + Pago) + gasto com EPI">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Total Geral (com EPI)</p>
+            <p className="text-2xl font-black font-mono text-slate-700">{formatCurrency(totalGeral)}</p>
+          </div>
         </div>
+
+        {(categoriasOrdenadas.length > 0 || gastoEpi > 0) && (
+          <div>
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Gasto por categoria</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {categoriasOrdenadas.map(([cat, valor]) => (
+                <div key={cat} className="bg-white border border-slate-100 rounded-xl p-3 shadow-sm">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 truncate" title={cat}>{cat}</p>
+                  <p className="text-base font-black font-mono text-slate-700">{formatCurrency(valor)}</p>
+                </div>
+              ))}
+              {gastoEpi > 0 && (
+                <div className="bg-amber-50 border border-amber-100 rounded-xl p-3" title="EPI é equipamento de segurança obrigatório — não é cobrado de nenhuma equipe específica, mas conta no Total Geral.">
+                  <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-1">EPI</p>
+                  <p className="text-base font-black font-mono text-amber-700">{formatCurrency(gastoEpi)}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
           <div className="flex flex-wrap gap-3">
@@ -115,6 +164,20 @@ export default function DebitosOficina() {
             </select>
             <input value={filtroEquipe} onChange={(e) => setFiltroEquipe(e.target.value)} placeholder="Filtrar por equipe..."
               className="px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#EA6C0A] w-52" />
+            <div className="flex items-center gap-2">
+              <label className="text-[10px] font-bold text-slate-400 uppercase">De</label>
+              <input type="date" value={filtroDataDe} onChange={(e) => setFiltroDataDe(e.target.value)}
+                className="px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#EA6C0A]" />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-[10px] font-bold text-slate-400 uppercase">Até</label>
+              <input type="date" value={filtroDataAte} onChange={(e) => setFiltroDataAte(e.target.value)}
+                className="px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#EA6C0A]" />
+            </div>
+            {(filtroDataDe || filtroDataAte) && (
+              <button type="button" onClick={() => { setFiltroDataDe(""); setFiltroDataAte(""); }}
+                className="text-[10px] font-bold text-[#EA6C0A] hover:underline">Limpar período</button>
+            )}
           </div>
         </div>
 
