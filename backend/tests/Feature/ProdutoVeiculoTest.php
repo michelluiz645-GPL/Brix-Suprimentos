@@ -129,4 +129,28 @@ class ProdutoVeiculoTest extends TestCase
             ->postJson('/api/veiculos', ['placa' => 'XYZ-9999', 'modelo' => 'Modelo B'])
             ->assertStatus(422);
     }
+
+    public function test_manutencao_pode_cadastrar_veiculo_mas_so_almoxarifado_edita(): void
+    {
+        $setorManutencao = Setor::where('codigo', Setor::MANUTENCAO)->firstOrFail();
+        $manutencao = User::create([
+            'nome' => 'Manutenção Teste', 'login' => 'manutencao.teste', 'email' => 'manutencao.teste@teste.com',
+            'password' => bcrypt('123456'), 'nivel' => 'ADMIN', 'setor_id' => $setorManutencao->id, 'ativo' => true,
+            'papel' => 'admin_manutencao',
+        ]);
+
+        $veiculo = $this->actingAs($manutencao)
+            ->postJson('/api/veiculos', ['placa' => 'MNT-0001', 'modelo' => 'Ford Ranger'])
+            ->assertStatus(201)
+            ->json('data');
+
+        $this->actingAs($manutencao)
+            ->putJson("/api/veiculos/{$veiculo['id']}", ['modelo' => 'Ford Ranger XLS'])
+            ->assertStatus(403);
+
+        $this->actingAs($this->admin)
+            ->putJson("/api/veiculos/{$veiculo['id']}", ['modelo' => 'Ford Ranger XLS'])
+            ->assertStatus(200)
+            ->assertJsonPath('data.modelo', 'Ford Ranger XLS');
+    }
 }

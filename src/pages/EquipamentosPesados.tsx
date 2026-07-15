@@ -4,8 +4,10 @@ import PageHeader from "@/components/PageHeader";
 import { useToast } from "@/hooks/useToast";
 import ToastContainer from "@/components/Toast";
 import { formatDate, today } from "@/utils/formatters";
-import type { Equipment } from "@/types";
+import type { Equipment, Vehicle } from "@/types";
 import { Plus, Edit2, History } from "lucide-react";
+
+type Aba = "equipamentos" | "frotas";
 
 const TIPOS = ["RETROESCAVADEIRA", "MOTONIVELADORA", "PÁ CARREGADEIRA", "TRATOR", "ROLO COMPACTADOR", "ESCAVADEIRA", "CAMINHÃO BASCULANTE", "CAMINHÃO PIPA", "OUTRO"];
 const TIPOS_MOV = ["MANUTENÇÃO", "DESLOCAMENTO", "RETORNO", "PARADO", "EM OPERAÇÃO"];
@@ -18,29 +20,40 @@ interface EquipExt extends Equipment { movimentacoes?: Movimentacao[]; }
 
 const emptyForm = (): Omit<EquipExt, "id"> => ({ nome: "", tipo: TIPOS[0], serie: "", equipe: "", obs: "", status: "ATIVO", movimentacoes: [] });
 const emptyMov = (): Movimentacao => ({ data: today(), tipo: TIPOS_MOV[0], responsavel: "", obs: "" });
+const emptyVeiculo = (): Omit<Vehicle, "id" | "status"> => ({ placa: "", modelo: "", tipo: "", ano: "", equipe: "" });
 
 export default function EquipamentosPesados() {
   const toast = useToast();
+  const [aba, setAba] = useState<Aba>("equipamentos");
   const [equipamentos, setEq] = useState<EquipExt[]>([]);
+  const [veiculos, setVeiculos] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtroStatus, setFiltroStatus] = useState("");
   const [filtroTipo, setFiltroTipo] = useState("");
   const [modal, setModal] = useState<"novo" | "editar" | "historico" | null>(null);
+  const [modalVeiculo, setModalVeiculo] = useState(false);
   const [sel, setSel] = useState<EquipExt | null>(null);
   const [form, setForm] = useState(emptyForm());
+  const [formVeiculo, setFormVeiculo] = useState(emptyVeiculo());
   const [novaMov, setNovaMov] = useState(emptyMov());
   const [salvando, setSalvando] = useState(false);
 
   const carregar = () => {
     setLoading(true);
-    api.equipamentos.list().then((r) => {
-      const d = (r as { data: EquipExt[] }).data ?? [];
+    Promise.all([
+      api.equipamentos.list(),
+      api.veiculos.list(),
+    ]).then(([eqRes, veicRes]) => {
+      const d = (eqRes as { data: EquipExt[] }).data ?? [];
       const list = (Array.isArray(d) ? d : Object.values(d)) as EquipExt[];
       setEq(list.map((e) => {
         let movs: Movimentacao[] = [];
         try { if (e.obs && e.obs.startsWith("{")) { const p = JSON.parse(e.obs); movs = p.movimentacoes ?? []; } } catch { /* nop */ }
         return { ...e, movimentacoes: movs };
       }));
+
+      const v = (veicRes as { data: Vehicle[] }).data ?? [];
+      setVeiculos(Array.isArray(v) ? v : Object.values(v));
     }).catch(() => toast.error("Não foi possível carregar os equipamentos."))
       .finally(() => setLoading(false));
   };
@@ -97,6 +110,24 @@ export default function EquipamentosPesados() {
   const setF = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm((p) => ({ ...p, [k]: e.target.value }));
 
+  const setFVeiculo = (k: keyof typeof formVeiculo) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setFormVeiculo((p) => ({ ...p, [k]: e.target.value }));
+
+  const handleSalvarVeiculo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formVeiculo.placa.trim()) { toast.error("Placa é obrigatória."); return; }
+    if (!formVeiculo.modelo.trim()) { toast.error("Modelo é obrigatório."); return; }
+    setSalvando(true);
+    try {
+      await api.veiculos.create(formVeiculo);
+      toast.success("Veículo cadastrado! A edição fica a cargo do Almoxarifado.");
+      setModalVeiculo(false); setFormVeiculo(emptyVeiculo());
+      carregar();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível cadastrar o veículo.");
+    } finally { setSalvando(false); }
+  };
+
   const filtered = equipamentos.filter((e) => {
     if (filtroStatus && e.status !== filtroStatus) return false;
     if (filtroTipo && e.tipo !== filtroTipo) return false;
@@ -108,11 +139,36 @@ export default function EquipamentosPesados() {
       <div className="space-y-6">
         <PageHeader title="Equipamentos Pesados" subtitle="Cadastro e histórico de movimentações"
           action={
-            <button onClick={abrirNovo} className="flex items-center gap-2 px-4 py-2 bg-[#EA6C0A] text-white text-xs font-bold rounded-lg hover:bg-[#C75B12] transition-colors">
-              <Plus size={14} /> Novo Equipamento
-            </button>
+            aba === "equipamentos" ? (
+              <button onClick={abrirNovo} className="flex items-center gap-2 px-4 py-2 bg-[#EA6C0A] text-white text-xs font-bold rounded-lg hover:bg-[#C75B12] transition-colors">
+                <Plus size={14} /> Novo Equipamento
+              </button>
+            ) : (
+              <button onClick={() => setModalVeiculo(true)} className="flex items-center gap-2 px-4 py-2 bg-[#EA6C0A] text-white text-xs font-bold rounded-lg hover:bg-[#C75B12] transition-colors">
+                <Plus size={14} /> Novo Veículo
+              </button>
+            )
           } />
 
+        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+          {([
+            ["equipamentos", "Equipamentos"],
+            ["frotas", "Frotas (Almoxarifado)"],
+          ] as [Aba, string][]).map(([a, label]) => (
+            <button key={a} onClick={() => setAba(a)}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${aba === a ? "bg-white shadow text-[#EA6C0A]" : "text-slate-500 hover:text-slate-700"}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {aba === "frotas" && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-700">
+            Você pode cadastrar um novo veículo aqui, mas a edição dos já existentes é feita pelo Almoxarifado.
+          </div>
+        )}
+
+        {aba === "equipamentos" && (
         <div className="bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
           <div className="flex flex-wrap gap-3">
             <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)}
@@ -128,7 +184,9 @@ export default function EquipamentosPesados() {
             </select>
           </div>
         </div>
+        )}
 
+        {aba === "equipamentos" && (
         <div className="bg-white border border-slate-100 rounded-xl shadow-sm overflow-hidden">
           {loading ? (
             <div className="p-10 text-center text-xs text-slate-400">Carregando...</div>
@@ -166,6 +224,41 @@ export default function EquipamentosPesados() {
             </table>
           )}
         </div>
+        )}
+
+        {aba === "frotas" && (
+        <div className="bg-white border border-slate-100 rounded-xl shadow-sm overflow-hidden">
+          {loading ? (
+            <div className="p-10 text-center text-xs text-slate-400">Carregando...</div>
+          ) : veiculos.length === 0 ? (
+            <div className="p-10 text-center text-xs text-slate-400">Nenhum veículo cadastrado no Almoxarifado.</div>
+          ) : (
+            <table className="w-full text-xs">
+              <thead><tr className="bg-slate-50 border-b border-slate-100">
+                {["Placa", "Modelo", "Tipo", "Ano", "Equipe", "Status"].map((h) => (
+                  <th key={h} className="p-3 font-semibold text-slate-500 text-left">{h}</th>
+                ))}
+              </tr></thead>
+              <tbody className="divide-y divide-slate-50">
+                {veiculos.map((v) => (
+                  <tr key={v.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="p-3 font-mono font-bold text-[#EA6C0A]">{v.placa}</td>
+                    <td className="p-3 font-medium text-slate-800">{v.modelo}</td>
+                    <td className="p-3 text-slate-500">{v.tipo}</td>
+                    <td className="p-3 font-mono text-slate-500">{v.ano || "—"}</td>
+                    <td className="p-3 text-slate-500">{v.equipe || "—"}</td>
+                    <td className="p-3">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${v.status === "ATIVO" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                        {v.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        )}
       </div>
 
       {/* Modal cadastro/edição */}
@@ -282,6 +375,47 @@ export default function EquipamentosPesados() {
               <button onClick={() => setModal(null)} className="px-5 py-2 text-xs font-bold text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors">Fechar</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Modal novo veículo */}
+      {modalVeiculo && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setModalVeiculo(false)}>
+          <form onSubmit={handleSalvarVeiculo} className="bg-white rounded-2xl shadow-xl w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 border-b border-slate-100">
+              <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Novo Veículo</h2>
+              <p className="text-xs text-slate-400 mt-1">Entra direto na frota do Almoxarifado.</p>
+            </div>
+            <div className="p-6 grid grid-cols-2 gap-4">
+              <div>
+                <label className={lbl}>Placa *</label>
+                <input value={formVeiculo.placa} onChange={setFVeiculo("placa")} placeholder="Ex: ABC-1234" className={`${inp} font-mono uppercase`} />
+              </div>
+              <div>
+                <label className={lbl}>Modelo *</label>
+                <input value={formVeiculo.modelo} onChange={setFVeiculo("modelo")} placeholder="Ex: Iveco Daily" className={inp} />
+              </div>
+              <div>
+                <label className={lbl}>Tipo</label>
+                <input value={formVeiculo.tipo} onChange={setFVeiculo("tipo")} placeholder="Ex: Caminhão, Retroescavadeira" className={inp} />
+              </div>
+              <div>
+                <label className={lbl}>Ano</label>
+                <input value={formVeiculo.ano} onChange={setFVeiculo("ano")} placeholder="Ex: 2020" className={`${inp} font-mono`} />
+              </div>
+              <div className="col-span-2">
+                <label className={lbl}>Equipe</label>
+                <input value={formVeiculo.equipe} onChange={setFVeiculo("equipe")} placeholder="Nº da equipe" className={inp} />
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-100 flex justify-end gap-3">
+              <button type="button" onClick={() => setModalVeiculo(false)} className="px-5 py-2 text-xs font-bold text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors">Cancelar</button>
+              <button type="submit" disabled={salvando}
+                className={`px-6 py-2 text-xs font-bold text-white rounded-lg transition-all ${salvando ? "bg-slate-400 cursor-not-allowed" : "bg-[#EA6C0A] hover:bg-[#C75B12]"}`}>
+                {salvando ? "Salvando..." : "Cadastrar"}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
