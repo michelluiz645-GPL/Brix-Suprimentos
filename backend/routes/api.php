@@ -167,11 +167,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/pedidos-orcamento/{pedidoOrcamento}/confirmar-recebimento',
         [PedidoOrcamentoController::class, 'confirmarRecebimento']
-    )->middleware('papel:op_manutencao,admin_manutencao,almoxarife');
+    )->middleware('papel:op_manutencao,admin_manutencao,op_engenharia,admin_engenharia,almoxarife');
 
     Route::post('/pedidos-orcamento/{pedidoOrcamento}/confirmar-retirada',
         [PedidoOrcamentoController::class, 'confirmarRetirada']
-    )->middleware('papel:op_manutencao,admin_manutencao');
+    )->middleware('papel:op_manutencao,admin_manutencao,op_engenharia,admin_engenharia');
 
     // RF-021 — Solicitação de Compra (SC)
     Route::get('/sc',  [SolicitacaoCompraController::class, 'index']);

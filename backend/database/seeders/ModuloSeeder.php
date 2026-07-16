@@ -54,8 +54,8 @@ class ModuloSeeder extends Seeder
             ['chave' => 'debitos_manutencao', 'nome' => 'Débitos de Manutenção', 'setores_aplicaveis' => [$eng, $man]],
             ['chave' => 'seguranca_dados', 'nome' => 'Segurança de Dados / Backup', 'setores_aplicaveis' => [$alm, $eng]],
 
-            // ── Pedido de Orçamento (Manutenção → visível no Almoxarifado) ──
-            ['chave' => 'pedido_orcamento', 'nome' => 'Pedido de Orçamento', 'setores_aplicaveis' => [$man, $alm]],
+            // ── Pedido de Orçamento (Manutenção/Engenharia → visível no Almoxarifado) ──
+            ['chave' => 'pedido_orcamento', 'nome' => 'Pedido de Orçamento', 'setores_aplicaveis' => [$man, $eng, $alm]],
         ];
 
         foreach ($modulos as $modulo) {

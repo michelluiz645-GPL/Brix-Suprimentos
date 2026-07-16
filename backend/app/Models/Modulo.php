@@ -18,6 +18,7 @@ class Modulo extends Model
         'cotador',
         'aprovador_manutencao',
         'aprovador_suprimentos',
+        'aprovador_engenharia',
         'comprador',
     ];
 
@@ -25,7 +26,7 @@ class Modulo extends Model
     {
         return $this->belongsToMany(User::class, 'user_modulo')
             ->using(UserModulo::class)
-            ->withPivot('responsabilidades');
+            ->withPivot('responsabilidades', 'setores_atendidos');
     }
 
     /**

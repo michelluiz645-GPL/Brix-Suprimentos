@@ -49,8 +49,27 @@ const NIVEL_COLOR: Record<string, string> = {
 };
 
 const RESPONSABILIDADES_PEDIDO_ORCAMENTO: ResponsabilidadePedidoOrcamento[] = [
-  "solicitante", "cotador", "aprovador_manutencao", "aprovador_suprimentos", "comprador",
+  "solicitante", "cotador", "aprovador_manutencao", "aprovador_suprimentos", "aprovador_engenharia", "comprador",
 ];
+
+// Cada setor só faz sentido acumular as responsabilidades que dizem respeito
+// a ele — Engenharia não deve ver "Aprovador Manutenção", por exemplo.
+const RESPONSABILIDADES_POR_SETOR: Record<string, ResponsabilidadePedidoOrcamento[]> = {
+  ALMOXARIFADO: ["solicitante", "cotador", "aprovador_suprimentos", "comprador"],
+  MANUTENCAO:   ["solicitante", "aprovador_manutencao"],
+  ENGENHARIA:   ["solicitante", "aprovador_engenharia"],
+};
+
+const RESPOSTAS_SUPRIMENTOS: ResponsabilidadePedidoOrcamento[] = ["cotador", "aprovador_suprimentos", "comprador"];
+
+const labelResponsabilidade = (resp: ResponsabilidadePedidoOrcamento, setor: string): string => {
+  if (resp === "solicitante") {
+    if (setor === "ENGENHARIA")   return "Solicitante (Engenharia — pedidos de Obra)";
+    if (setor === "ALMOXARIFADO") return "Solicitante (Almoxarifado — Reposição Automática)";
+    return "Solicitante (Manutenção)";
+  }
+  return RESPONSABILIDADE_PEDIDO_ORCAMENTO_LABELS[resp];
+};
 
 export default function Usuarios() {
   const toast = useToast();
@@ -97,6 +116,12 @@ export default function Usuarios() {
     const atuais = p.responsabilidades?.[modulo] ?? [];
     const novas = atuais.includes(resp) ? atuais.filter((r) => r !== resp) : [...atuais, resp];
     return { ...p, responsabilidades: { ...p.responsabilidades, [modulo]: novas } };
+  });
+
+  const toggleSetorAtendido = (modulo: string, setorCodigo: string) => setForm((p) => {
+    const atuais = p.setores_atendidos?.[modulo] ?? [];
+    const novos = atuais.includes(setorCodigo) ? atuais.filter((s) => s !== setorCodigo) : [...atuais, setorCodigo];
+    return { ...p, setores_atendidos: { ...p.setores_atendidos, [modulo]: novos } };
   });
 
   const handleSave = async () => {
@@ -223,6 +248,8 @@ export default function Usuarios() {
                 <option value="admin_manutencao">Admin Manutenção — aprova SCs da equipe</option>
                 <option value="op_suprimentos">Operacional Suprimentos — faz cotação e compra</option>
                 <option value="admin_suprimentos">Admin Suprimentos — aprovação final</option>
+                <option value="op_engenharia">Operacional Engenharia — abre pedidos de Obra</option>
+                <option value="admin_engenharia">Admin Engenharia — aprova pedidos de Obra</option>
                 <option value="almoxarife">Almoxarife — dá entrada de materiais</option>
                 <option value="admin_geral">Administrador Geral — acesso irrestrito</option>
               </select>
@@ -236,11 +263,14 @@ export default function Usuarios() {
             )}
           </div>
 
-          {form.nivel !== "ADMIN" && (
+          {form.papel !== "admin_geral" && (
             <div>
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-2">
                 Módulos Permitidos <span className="font-normal normal-case text-slate-400">(apenas os disponíveis para o setor selecionado)</span>
               </label>
+              {form.nivel === "ADMIN" && (
+                <p className="text-[10px] text-amber-600 mb-2">Mesmo sendo Admin, esse usuário só vê os módulos marcados aqui — só "Administrador Geral" tem acesso irrestrito a tudo.</p>
+              )}
               <div className="grid grid-cols-3 gap-1.5">
                 {MODULOS_ALL.filter(({ chave }) => modulosDoSetor.includes(chave)).map(({ chave, label }) => {
                   const checked = (form.modulos ?? []).includes(chave);
@@ -256,28 +286,57 @@ export default function Usuarios() {
                 })}
               </div>
 
-              {(form.modulos ?? []).includes("pedido_orcamento") && (
-                <div className="mt-3 p-3 bg-orange-50/50 border border-orange-100 rounded-lg">
-                  <label className="text-[10px] font-bold text-[#C75B12] uppercase tracking-widest block mb-2">
-                    Responsabilidades em Pedido de Orçamento
-                  </label>
-                  <p className="text-[10px] text-slate-500 mb-2">Um usuário pode acumular mais de uma responsabilidade.</p>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {RESPONSABILIDADES_PEDIDO_ORCAMENTO.map((resp) => {
-                      const checked = (form.responsabilidades?.pedido_orcamento ?? []).includes(resp);
-                      return (
-                        <label key={resp} className={`flex items-center gap-2 cursor-pointer px-2 py-1.5 rounded-lg border text-xs transition-colors ${checked ? "bg-[#EA6C0A]/10 border-[#EA6C0A]/30 text-[#C75B12] font-semibold" : "bg-white border-slate-200 text-slate-500"}`}>
-                          <input type="checkbox" checked={checked} onChange={() => toggleResponsabilidade("pedido_orcamento", resp)} className="hidden" />
-                          <span className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 ${checked ? "bg-[#EA6C0A] border-[#EA6C0A]" : "border-slate-300"}`}>
-                            {checked && <span className="text-white text-[8px] font-bold">✓</span>}
-                          </span>
-                          {RESPONSABILIDADE_PEDIDO_ORCAMENTO_LABELS[resp]}
+              {(form.modulos ?? []).includes("pedido_orcamento") && (() => {
+                const setorForm = String(form.setor ?? "");
+                const respsDoSetor = RESPONSABILIDADES_POR_SETOR[setorForm] ?? RESPONSABILIDADES_PEDIDO_ORCAMENTO;
+                const respsAtuais = form.responsabilidades?.pedido_orcamento ?? [];
+                const temRespSuprimentos = RESPOSTAS_SUPRIMENTOS.some((r) => respsAtuais.includes(r));
+                return (
+                  <div className="mt-3 p-3 bg-orange-50/50 border border-orange-100 rounded-lg">
+                    <label className="text-[10px] font-bold text-[#C75B12] uppercase tracking-widest block mb-2">
+                      Responsabilidades em Pedido de Orçamento
+                    </label>
+                    <p className="text-[10px] text-slate-500 mb-2">Um usuário pode acumular mais de uma responsabilidade.</p>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {respsDoSetor.map((resp) => {
+                        const checked = respsAtuais.includes(resp);
+                        return (
+                          <label key={resp} className={`flex items-center gap-2 cursor-pointer px-2 py-1.5 rounded-lg border text-xs transition-colors ${checked ? "bg-[#EA6C0A]/10 border-[#EA6C0A]/30 text-[#C75B12] font-semibold" : "bg-white border-slate-200 text-slate-500"}`}>
+                            <input type="checkbox" checked={checked} onChange={() => toggleResponsabilidade("pedido_orcamento", resp)} className="hidden" />
+                            <span className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 ${checked ? "bg-[#EA6C0A] border-[#EA6C0A]" : "border-slate-300"}`}>
+                              {checked && <span className="text-white text-[8px] font-bold">✓</span>}
+                            </span>
+                            {labelResponsabilidade(resp, setorForm)}
+                          </label>
+                        );
+                      })}
+                    </div>
+
+                    {temRespSuprimentos && (
+                      <div className="mt-3 pt-3 border-t border-orange-200">
+                        <label className="text-[10px] font-bold text-[#C75B12] uppercase tracking-widest block mb-1">
+                          Setores Atendidos
                         </label>
-                      );
-                    })}
+                        <p className="text-[10px] text-slate-500 mb-2">Quais setores solicitantes essa pessoa recebe pedido — nenhum marcado = atende todos.</p>
+                        <div className="flex gap-1.5">
+                          {["MANUTENCAO", "ENGENHARIA"].map((s) => {
+                            const checked = (form.setores_atendidos?.pedido_orcamento ?? []).includes(s);
+                            return (
+                              <label key={s} className={`flex items-center gap-2 cursor-pointer px-3 py-1.5 rounded-lg border text-xs transition-colors ${checked ? "bg-[#EA6C0A]/10 border-[#EA6C0A]/30 text-[#C75B12] font-semibold" : "bg-white border-slate-200 text-slate-500"}`}>
+                                <input type="checkbox" checked={checked} onChange={() => toggleSetorAtendido("pedido_orcamento", s)} className="hidden" />
+                                <span className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 ${checked ? "bg-[#EA6C0A] border-[#EA6C0A]" : "border-slate-300"}`}>
+                                  {checked && <span className="text-white text-[8px] font-bold">✓</span>}
+                                </span>
+                                {s === "MANUTENCAO" ? "Manutenção" : "Engenharia"}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           )}
 

@@ -30,6 +30,24 @@ const PAPEIS: { papel: Papel; icone: string; setor: string; setorCor: string; de
     naoPode: ["Aprovação final", "Ver SCs de outros setores (filtrado)"],
   },
   {
+    papel: "op_engenharia",
+    icone: "🏗️",
+    setor: "Engenharia",
+    setorCor: "bg-orange-100 text-orange-700",
+    descricao: "Solicita material de Obra e acompanha o andamento do pedido.",
+    pode: ["Abrir pedido vinculado a uma Obra", "Ver seus próprios pedidos", "Confirmar retirada"],
+    naoPode: ["Aprovar pedidos", "Registrar cotação", "Ver pedidos de outros"],
+  },
+  {
+    papel: "admin_engenharia",
+    icone: "🏗️",
+    setor: "Admin Engenharia",
+    setorCor: "bg-orange-100 text-orange-700",
+    descricao: "Aprova o orçamento de materiais de Obra — não passa pela Manutenção, vai direto pro Suprimentos.",
+    pode: ["Abrir pedido vinculado a uma Obra", "Ver todos os pedidos da Engenharia", "Aprovar orçamento (junto com Suprimentos)"],
+    naoPode: ["Aprovar pelo Suprimentos", "Registrar compra"],
+  },
+  {
     papel: "admin_suprimentos",
     icone: "📦",
     setor: "Admin Suprimentos",
@@ -63,6 +81,8 @@ const NOTIF_DEFAULTS: Record<Papel, string[]> = {
   admin_manutencao: ["sc_aguardando_aprovacao_mnt", "sc_rejeitada_sup"],
   op_suprimentos:   ["nova_sc_aberta", "sc_aprovada_compra", "material_a_chegar"],
   admin_suprimentos:["sc_aguardando_aprovacao_sup", "sla_vencendo", "resumo_diario"],
+  op_engenharia:    ["sc_propria_recebida", "sc_aprovada", "sc_comprada", "material_entregue"],
+  admin_engenharia: ["sc_aguardando_aprovacao_sup", "sc_rejeitada_sup"],
   almoxarife:       ["material_a_chegar", "material_atrasado"],
   admin_geral:      ["nova_sc_aberta", "sc_aguardando_aprovacao_mnt", "sc_aguardando_aprovacao_sup", "sc_aprovada_compra", "material_a_chegar", "material_atrasado", "sla_vencendo", "resumo_diario", "sc_propria_recebida", "sc_aprovada", "sc_comprada", "material_entregue", "sc_rejeitada_sup"],
 };

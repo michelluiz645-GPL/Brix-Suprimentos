@@ -80,6 +80,7 @@ class AuthController extends Controller
             'setor' => $user->setor->codigo,
             'modulos' => $user->modulos->pluck('chave'),
             'responsabilidades' => $user->responsabilidadesPorModulo(),
+            'setores_atendidos' => $user->setoresAtendidosPorModulo(),
         ];
     }
 }

@@ -45,6 +45,9 @@ class PedidoOrcamentoController extends Controller
         if ($erro = $this->garantirStatus($pedidoOrcamento, 'PENDENTE')) {
             return $erro;
         }
+        if (! $request->user()->podeAgirEmPedido('pedido_orcamento', 'cotador', $pedidoOrcamento->setor)) {
+            return $this->erroResponsabilidade();
+        }
 
         $this->service->iniciarCotacao($pedidoOrcamento, $request->user());
 
@@ -56,6 +59,9 @@ class PedidoOrcamentoController extends Controller
         if ($erro = $this->garantirStatus($pedidoOrcamento, 'COTANDO')) {
             return $erro;
         }
+        if (! $request->user()->podeAgirEmPedido('pedido_orcamento', 'cotador', $pedidoOrcamento->setor)) {
+            return $this->erroResponsabilidade();
+        }
 
         $this->service->enviarParaAprovacaoManutencao($pedidoOrcamento, $request->validated(), $request->user());
 
@@ -63,10 +69,11 @@ class PedidoOrcamentoController extends Controller
     }
 
     /**
-     * A responsabilidade exigida depende do setor do pedido: para MANUTENCAO
-     * (e demais setores), quem aprova o orçamento é a Manutenção; para
-     * ALMOXARIFADO (Reposição Automática), não existe uma Manutenção externa
-     * envolvida — quem aprova é o próprio responsável de Suprimentos.
+     * A responsabilidade exigida depende do setor do pedido: MANUTENCAO passa
+     * pelo aprovador_manutencao; ALMOXARIFADO (Reposição Automática) passa
+     * pelo aprovador_suprimentos; ENGENHARIA (materiais de Obra) tem seu
+     * próprio aprovador_engenharia — nenhum dos dois últimos passa pela
+     * Manutenção.
      */
     public function aprovarManutencao(AprovarManutencaoPedidoOrcamentoRequest $request, PedidoOrcamento $pedidoOrcamento): JsonResponse
     {
@@ -74,8 +81,8 @@ class PedidoOrcamentoController extends Controller
             return $erro;
         }
 
-        $responsabilidadeExigida = $pedidoOrcamento->setor === 'ALMOXARIFADO' ? 'aprovador_suprimentos' : 'aprovador_manutencao';
-        if (! $request->user()->temResponsabilidade('pedido_orcamento', $responsabilidadeExigida)) {
+        $responsabilidadeExigida = $this->responsabilidadeAprovacaoOrcamento($pedidoOrcamento);
+        if (! $request->user()->podeAgirEmPedido('pedido_orcamento', $responsabilidadeExigida, $pedidoOrcamento->setor)) {
             return $this->erroResponsabilidade();
         }
 
@@ -90,15 +97,13 @@ class PedidoOrcamentoController extends Controller
 
     /**
      * A responsabilidade exigida para rejeitar depende do estágio atual do
-     * pedido (Manutenção rejeita o orçamento, Suprimentos rejeita a compra) —
-     * por isso a checagem acontece aqui, e não em uma rota/middleware fixos.
-     * Pedidos do ALMOXARIFADO não passam pela Manutenção: quem rejeita o
-     * orçamento nesse caso também é o aprovador de Suprimentos.
+     * pedido — por isso a checagem acontece aqui, e não em uma rota/middleware
+     * fixos.
      */
     public function rejeitar(RejeitarPedidoOrcamentoRequest $request, PedidoOrcamento $pedidoOrcamento): JsonResponse
     {
         $responsabilidadeExigida = match ($pedidoOrcamento->status) {
-            'AGUARDANDO_APROVACAO_MANUTENCAO' => $pedidoOrcamento->setor === 'ALMOXARIFADO' ? 'aprovador_suprimentos' : 'aprovador_manutencao',
+            'AGUARDANDO_APROVACAO_MANUTENCAO' => $this->responsabilidadeAprovacaoOrcamento($pedidoOrcamento),
             'AGUARDANDO_APROVACAO_COMPRA'      => 'aprovador_suprimentos',
             default => null,
         };
@@ -106,7 +111,7 @@ class PedidoOrcamentoController extends Controller
         if (! $responsabilidadeExigida) {
             return response()->json(['data' => null, 'message' => 'Este pedido não pode ser rejeitado no estágio atual.'], 422);
         }
-        if (! $request->user()->temResponsabilidade('pedido_orcamento', $responsabilidadeExigida)) {
+        if (! $request->user()->podeAgirEmPedido('pedido_orcamento', $responsabilidadeExigida, $pedidoOrcamento->setor)) {
             return $this->erroResponsabilidade();
         }
 
@@ -120,6 +125,9 @@ class PedidoOrcamentoController extends Controller
         if ($erro = $this->garantirStatus($pedidoOrcamento, 'AGUARDANDO_APROVACAO_COMPRA')) {
             return $erro;
         }
+        if (! $request->user()->podeAgirEmPedido('pedido_orcamento', 'aprovador_suprimentos', $pedidoOrcamento->setor)) {
+            return $this->erroResponsabilidade();
+        }
 
         $this->service->aprovarCompra($pedidoOrcamento, $request->user());
 
@@ -130,6 +138,9 @@ class PedidoOrcamentoController extends Controller
     {
         if ($erro = $this->garantirStatus($pedidoOrcamento, 'APROVADO')) {
             return $erro;
+        }
+        if (! $request->user()->podeAgirEmPedido('pedido_orcamento', 'comprador', $pedidoOrcamento->setor)) {
+            return $this->erroResponsabilidade();
         }
 
         try {
@@ -161,6 +172,15 @@ class PedidoOrcamentoController extends Controller
         }
 
         return response()->json(['data' => $this->serialize($pedidoOrcamento->fresh()), 'message' => 'Retirada confirmada.']);
+    }
+
+    private function responsabilidadeAprovacaoOrcamento(PedidoOrcamento $pedido): string
+    {
+        return match ($pedido->setor) {
+            'ALMOXARIFADO' => 'aprovador_suprimentos',
+            'ENGENHARIA'   => 'aprovador_engenharia',
+            default        => 'aprovador_manutencao',
+        };
     }
 
     private function garantirStatus(PedidoOrcamento $pedido, string $statusEsperado): ?JsonResponse

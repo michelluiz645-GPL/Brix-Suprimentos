@@ -45,6 +45,9 @@ class UsuarioController extends Controller
             'responsabilidades'                     => ['sometimes', 'array'],
             'responsabilidades.pedido_orcamento'     => ['sometimes', 'array'],
             'responsabilidades.pedido_orcamento.*'   => [Rule::in(Modulo::RESPONSABILIDADES_PEDIDO_ORCAMENTO)],
+            'setores_atendidos'                      => ['sometimes', 'array'],
+            'setores_atendidos.pedido_orcamento'     => ['sometimes', 'array'],
+            'setores_atendidos.pedido_orcamento.*'   => [Rule::in([Setor::MANUTENCAO, Setor::ENGENHARIA])],
         ], [
             'login.unique'  => 'Este usuário já está cadastrado.',
             'email.unique'  => 'Este e-mail já está em uso.',
@@ -67,7 +70,7 @@ class UsuarioController extends Controller
         ]);
 
         if (isset($data['modulos'])) {
-            $this->sincronizarModulos($usuario, $data['modulos'], $data['responsabilidades'] ?? []);
+            $this->sincronizarModulos($usuario, $data['modulos'], $data['responsabilidades'] ?? [], $data['setores_atendidos'] ?? []);
         } else {
             app(PermissaoService::class)->aplicarTemplatePadrao($usuario);
         }
@@ -91,6 +94,9 @@ class UsuarioController extends Controller
             'responsabilidades'                     => ['sometimes', 'array'],
             'responsabilidades.pedido_orcamento'     => ['sometimes', 'array'],
             'responsabilidades.pedido_orcamento.*'   => [Rule::in(Modulo::RESPONSABILIDADES_PEDIDO_ORCAMENTO)],
+            'setores_atendidos'                      => ['sometimes', 'array'],
+            'setores_atendidos.pedido_orcamento'     => ['sometimes', 'array'],
+            'setores_atendidos.pedido_orcamento.*'   => [Rule::in([Setor::MANUTENCAO, Setor::ENGENHARIA])],
         ]);
 
         $campos = array_filter(
@@ -100,9 +106,9 @@ class UsuarioController extends Controller
         $usuario->update($campos);
 
         if (isset($data['modulos'])) {
-            $this->sincronizarModulos($usuario, $data['modulos'], $data['responsabilidades'] ?? []);
-        } elseif (isset($data['responsabilidades'])) {
-            $this->sincronizarModulos($usuario, $usuario->modulos->pluck('chave')->all(), $data['responsabilidades']);
+            $this->sincronizarModulos($usuario, $data['modulos'], $data['responsabilidades'] ?? [], $data['setores_atendidos'] ?? []);
+        } elseif (isset($data['responsabilidades']) || isset($data['setores_atendidos'])) {
+            $this->sincronizarModulos($usuario, $usuario->modulos->pluck('chave')->all(), $data['responsabilidades'] ?? [], $data['setores_atendidos'] ?? []);
         }
 
         return response()->json([
@@ -131,7 +137,7 @@ class UsuarioController extends Controller
      * usuário (RN-002.1) — a tela já filtra isso, mas a API não deve
      * confiar apenas no client.
      */
-    private function sincronizarModulos(User $usuario, array $chavesModulos, array $responsabilidadesPorModulo): void
+    private function sincronizarModulos(User $usuario, array $chavesModulos, array $responsabilidadesPorModulo, array $setoresAtendidosPorModulo = []): void
     {
         $codigoSetor = $usuario->setor->codigo;
 
@@ -140,7 +146,10 @@ class UsuarioController extends Controller
             ->filter(fn (Modulo $m) => $m->disponivelParaSetor($codigoSetor));
 
         $sync = $modulos->mapWithKeys(fn (Modulo $m) => [
-            $m->id => ['responsabilidades' => $responsabilidadesPorModulo[$m->chave] ?? null],
+            $m->id => [
+                'responsabilidades' => $responsabilidadesPorModulo[$m->chave] ?? null,
+                'setores_atendidos' => $setoresAtendidosPorModulo[$m->chave] ?? null,
+            ],
         ])->all();
 
         $usuario->modulos()->sync($sync);
@@ -161,6 +170,7 @@ class UsuarioController extends Controller
             'ativo'    => $u->ativo,
             'modulos'  => $u->modulos->pluck('chave'),
             'responsabilidades' => $u->responsabilidadesPorModulo(),
+            'setores_atendidos' => $u->setoresAtendidosPorModulo(),
         ];
     }
 }

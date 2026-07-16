@@ -9,6 +9,7 @@ class UserModulo extends Pivot
     protected $table = 'user_modulo';
 
     protected $casts = [
-        'responsabilidades' => 'array',
+        'responsabilidades'  => 'array',
+        'setores_atendidos'  => 'array',
     ];
 }

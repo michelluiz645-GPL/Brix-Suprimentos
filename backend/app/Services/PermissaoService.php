@@ -37,13 +37,13 @@ class PermissaoService
         Setor::ENGENHARIA => [
             User::NIVEL_OPERADOR => [
                 'obras_projetos', 'catalogo_materiais_obra', 'rel_abastecimentos',
-                'suprimentos_kobo', 'solicitacao_compra', 'pedido_compra',
+                'suprimentos_kobo', 'solicitacao_compra', 'pedido_compra', 'pedido_orcamento',
                 'seguranca_epi', 'equipamentos_pesados', 'debitos_manutencao',
             ],
             User::NIVEL_ADMIN => [
                 'obras_projetos', 'catalogo_materiais_obra', 'fornecedores',
                 'rel_abastecimentos', 'suprimentos_kobo', 'solicitacao_compra',
-                'pedido_compra', 'seguranca_epi', 'equipamentos_pesados',
+                'pedido_compra', 'pedido_orcamento', 'seguranca_epi', 'equipamentos_pesados',
                 'debitos_manutencao', 'seguranca_dados',
             ],
         ],

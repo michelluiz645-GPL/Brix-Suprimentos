@@ -10,6 +10,8 @@ export type Papel =
   | "admin_manutencao"
   | "op_suprimentos"
   | "admin_suprimentos"
+  | "op_engenharia"
+  | "admin_engenharia"
   | "almoxarife"
   | "admin_geral";
 
@@ -18,6 +20,8 @@ export const PAPEL_LABELS: Record<Papel, string> = {
   admin_manutencao: "Admin Manutenção",
   op_suprimentos:   "Operacional Suprimentos",
   admin_suprimentos:"Admin Suprimentos",
+  op_engenharia:    "Operacional Engenharia",
+  admin_engenharia: "Admin Engenharia",
   almoxarife:       "Almoxarife",
   admin_geral:      "Administrador Geral",
 };
@@ -27,6 +31,7 @@ export type ResponsabilidadePedidoOrcamento =
   | "cotador"
   | "aprovador_manutencao"
   | "aprovador_suprimentos"
+  | "aprovador_engenharia"
   | "comprador";
 
 export const RESPONSABILIDADE_PEDIDO_ORCAMENTO_LABELS: Record<ResponsabilidadePedidoOrcamento, string> = {
@@ -34,6 +39,7 @@ export const RESPONSABILIDADE_PEDIDO_ORCAMENTO_LABELS: Record<ResponsabilidadePe
   cotador:                "Cotador (Suprimentos)",
   aprovador_manutencao:   "Aprovador — Manutenção Gestor",
   aprovador_suprimentos:  "Aprovador — Suprimentos Gestor",
+  aprovador_engenharia:   "Aprovador — Engenharia Gestor",
   comprador:              "Comprador (Suprimentos)",
 };
 
@@ -48,6 +54,7 @@ export interface User {
   setor: Setor | string;
   modulos: string[];
   responsabilidades?: Record<string, string[]>;
+  setores_atendidos?: Record<string, string[]>;
   senha?: string;
 }
 
@@ -167,6 +174,7 @@ export interface DeliveryItem {
   colaborador_epi?: string;
   destino?: string;
   destino_frota?: string;
+  destino_obra?: string;
   epi_vencimento?: string;
   categoria?: string;
 }

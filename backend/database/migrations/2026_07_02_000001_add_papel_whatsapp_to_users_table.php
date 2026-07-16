@@ -14,6 +14,8 @@ return new class extends Migration
                 'admin_manutencao',
                 'op_suprimentos',
                 'admin_suprimentos',
+                'op_engenharia',
+                'admin_engenharia',
                 'almoxarife',
                 'admin_geral',
             ])->default('op_manutencao')->after('nivel');

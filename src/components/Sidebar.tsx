@@ -69,20 +69,20 @@ const MENUS_BY_SECTOR: Record<string, string[]> = {
     "Funcionários", "Equipes", "Frotas", "Reposição Auto.", "Ped. Orçamento", "EPI",
   ],
   ENGENHARIA_ADMIN: [
-    "Dashboard", "Obras & Projetos", "Catálogo Obra", "Fornecedores",
-    "Sol. de Compra", "Pedidos de Compra", "EPI", "Equipamentos",
+    "Obras & Projetos", "Catálogo Obra", "Fornecedores",
+    "Sol. de Compra", "Pedidos de Compra", "Ped. Orçamento", "EPI", "Equipamentos",
     "Débitos Manut.", "Suprimentos Kobo", "Rel. Abastecimento", "Backup",
   ],
   ENGENHARIA_OPERADOR: [
-    "Dashboard", "Obras & Projetos", "Catálogo Obra",
-    "Sol. de Compra", "Pedidos de Compra", "EPI", "Equipamentos",
+    "Obras & Projetos", "Catálogo Obra",
+    "Sol. de Compra", "Pedidos de Compra", "Ped. Orçamento", "EPI", "Equipamentos",
     "Débitos Manut.", "Suprimentos Kobo", "Rel. Abastecimento",
   ],
   MANUTENCAO_ADMIN: [
-    "Dashboard", "Ped. Orçamento", "EPI", "Equipamentos", "Débitos Manut.",
+    "Ped. Orçamento", "EPI", "Equipamentos", "Débitos Manut.",
   ],
   MANUTENCAO_OPERADOR: [
-    "Dashboard", "Ped. Orçamento", "EPI", "Equipamentos", "Débitos Manut.",
+    "Ped. Orçamento", "EPI", "Equipamentos", "Débitos Manut.",
   ],
 };
 
@@ -140,7 +140,13 @@ export function getMenusDoUsuario(user: UserType, setor: Setor | string): string
   const key = `${setor}_${nivel}`;
   const baseMenus = MENUS_BY_SECTOR[key] ?? MENUS_BY_SECTOR["ALMOXARIFADO_OPERADOR"];
 
-  return user.modulos?.length && nivel !== "ADMIN"
+  // Administrador Geral (papel admin_geral) tem acesso irrestrito de verdade.
+  // Qualquer outro Admin — mesmo nível ADMIN, mas admin de setor (Engenharia,
+  // Manutenção, Suprimentos) — respeita a lista individual de módulos
+  // liberados igual um Operador (RF-002: "o Admin customiza individualmente").
+  if (user.papel === "admin_geral") return baseMenus;
+
+  return user.modulos?.length
     ? baseMenus.filter((m) => user.modulos.includes(MENU_PARA_MODULO_CHAVE[m] ?? m))
     : baseMenus;
 }

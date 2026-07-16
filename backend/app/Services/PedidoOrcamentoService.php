@@ -24,15 +24,30 @@ class PedidoOrcamentoService
         'CONCLUIDO',
     ];
 
-    private const STEP_TITULOS = [
-        'Solicitação criada',
-        'Cotação em andamento',
-        'Aguardando aprovação da Manutenção',
-        'Aguardando aprovação da Compra',
-        'Compra aprovada',
-        'Em trânsito',
-        'Entrega concluída',
-    ];
+    /**
+     * AGUARDANDO_APROVACAO_MANUTENCAO é um único status compartilhado pelos
+     * três setores (nome herdado da origem histórica do fluxo, na
+     * Manutenção), mas quem aprova de fato muda por setor — o título exibido
+     * na linha do tempo precisa acompanhar.
+     */
+    private function stepTitulos(string $setor): array
+    {
+        $aprovador = match ($setor) {
+            'ALMOXARIFADO' => 'Suprimentos',
+            'ENGENHARIA'   => 'Engenharia',
+            default        => 'Manutenção',
+        };
+
+        return [
+            'Solicitação criada',
+            'Cotação em andamento',
+            "Aguardando aprovação da {$aprovador}",
+            'Aguardando aprovação da Compra',
+            'Compra aprovada',
+            'Em trânsito',
+            'Entrega concluída',
+        ];
+    }
 
     /**
      * @throws \InvalidArgumentException se algum item (por código de produto) já tiver um pedido em aberto
@@ -42,11 +57,13 @@ class PedidoOrcamentoService
         $this->garantirSemPedidoAbertoParaOsProdutos($dados['itens']);
 
         return DB::transaction(function () use ($dados, $solicitante) {
+            $setor = $dados['setor'] ?? 'MANUTENCAO';
+
             $pedido = PedidoOrcamento::create([
                 'numero_sc'      => $dados['numero_sc'] ?? $this->gerarNumero(),
                 'data'           => $dados['data'],
                 'data_desejada'  => $dados['data_desejada'] ?? null,
-                'setor'          => $dados['setor'] ?? 'MANUTENCAO',
+                'setor'          => $setor,
                 'solicitante_id' => $solicitante->id,
                 'destino'        => $dados['destino'],
                 'tipo_destino'   => $dados['tipo_destino'],
@@ -54,7 +71,7 @@ class PedidoOrcamentoService
                 'itens'          => $dados['itens'],
                 'valor_total'    => 0,
                 'status'         => 'PENDENTE',
-                'timeline'       => $this->timelineInicial($solicitante),
+                'timeline'       => $this->timelineInicial($solicitante, $setor),
             ]);
 
             $this->notificar(['op_suprimentos', 'admin_suprimentos'], "Novo pedido de orçamento: {$pedido->numero_sc}");
@@ -93,10 +110,13 @@ class PedidoOrcamentoService
 
         $this->avancarTimeline($pedido, $statusAnterior, $responsavel->nome);
 
-        // ALMOXARIFADO (Reposição Automática) não passa pela Manutenção —
-        // quem precisa agir já é o próprio aprovador de Suprimentos.
+        // ALMOXARIFADO (Reposição Automática) e ENGENHARIA (materiais de Obra)
+        // não passam pela Manutenção — cada um é aprovado pelo seu próprio
+        // gestor (Suprimentos ou Engenharia, respectivamente).
         if ($pedido->setor === 'ALMOXARIFADO') {
             $this->notificar(['admin_suprimentos'], "Pedido {$pedido->numero_sc} aguardando sua aprovação.");
+        } elseif ($pedido->setor === 'ENGENHARIA') {
+            $this->notificar(['admin_engenharia'], "Pedido {$pedido->numero_sc} aguardando sua aprovação.");
         } else {
             $this->notificar(['admin_manutencao'], "Pedido {$pedido->numero_sc} aguardando aprovação da Manutenção.");
         }
@@ -274,14 +294,22 @@ class PedidoOrcamentoService
         }
     }
 
-    private function timelineInicial(User $solicitante): array
+    private function timelineInicial(User $solicitante, string $setor): array
     {
+        $setorLabel = match ($setor) {
+            'ALMOXARIFADO' => 'Suprimentos',
+            'ENGENHARIA'   => 'Engenharia',
+            default        => 'Manutenção',
+        };
+
+        $titulos = $this->stepTitulos($setor);
+
         return array_map(fn (string $titulo, int $i) => [
             'titulo'    => $titulo,
-            'subtitulo' => $i === 0 ? "{$solicitante->nome} — Manutenção" : '',
+            'subtitulo' => $i === 0 ? "{$solicitante->nome} — {$setorLabel}" : '',
             'data'      => $i === 0 ? now()->format('d/m/Y H:i') : null,
             'estado'    => $i === 0 ? 'atual' : 'futuro',
-        ], self::STEP_TITULOS, array_keys(self::STEP_TITULOS));
+        ], $titulos, array_keys($titulos));
     }
 
     private function avancarTimeline(

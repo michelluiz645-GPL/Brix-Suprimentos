@@ -16,6 +16,8 @@ type TipoDestino = "FROTA" | "OBRA" | "EQUIPAMENTO" | "ESTOQUE";
 type TipoAcao    = "aprovar_compra" | "rejeitar" | "comprar" | "receber" | "retirar" | null;
 
 interface Item { descricao: string; quantidade: number; unidade: string; }
+interface ObraOpcao { id?: number; nome: string; status: string }
+interface MaterialObraOpcao { codigo: string; nome: string; unidade: string }
 interface TimelineStep {
   titulo: string; subtitulo: string; data?: string | null;
   estado: "concluido" | "atual" | "rejeitado" | "futuro";
@@ -43,7 +45,7 @@ interface Pedido {
   motivo_rejeicao?: string | null;
 }
 interface Props {
-  user: { login: string; nome: string; nivel: string; papel?: string; responsabilidades?: Record<string, string[]> };
+  user: { login: string; nome: string; nivel: string; papel?: string; responsabilidades?: Record<string, string[]>; setores_atendidos?: Record<string, string[]> };
   setor: string;
 }
 
@@ -54,13 +56,33 @@ const EQUIPAMENTOS_LIST = ["Gerador 180kVA","Compressor de Ar 250L","Bomba de Co
 const ITEM_VAZIO: Item = { descricao: "", quantidade: 1, unidade: "Un" };
 
 const RESPONSABILIDADES_TODAS: ResponsabilidadePedidoOrcamento[] = [
-  "solicitante", "cotador", "aprovador_manutencao", "aprovador_suprimentos", "comprador",
+  "solicitante", "cotador", "aprovador_manutencao", "aprovador_suprimentos", "aprovador_engenharia", "comprador",
 ];
+
+// Admin de setor (nivel ADMIN, mas papel setorial — não admin_geral) só
+// acumula automaticamente as responsabilidades que fazem sentido pro
+// próprio setor, espelhando a regra do backend (User::temResponsabilidade).
+const RESPONSABILIDADES_POR_SETOR: Record<string, ResponsabilidadePedidoOrcamento[]> = {
+  ALMOXARIFADO: ["solicitante", "cotador", "aprovador_suprimentos", "comprador"],
+  MANUTENCAO:   ["solicitante", "aprovador_manutencao"],
+  ENGENHARIA:   ["solicitante", "aprovador_engenharia"],
+};
 
 const STATUS_LABEL: Record<Status, string> = {
   PENDENTE:"Pendente", COTANDO:"Cotando",
   AGUARDANDO_APROVACAO_MANUTENCAO:"Ag. Aprov. Manutenção", AGUARDANDO_APROVACAO_COMPRA:"Ag. Aprov. Compra",
   APROVADO:"Pendente de Compra", EM_TRANSITO:"Em Trânsito", CONCLUIDO:"Concluído", REJEITADO:"Rejeitado",
+};
+
+// AGUARDANDO_APROVACAO_MANUTENCAO é um único status compartilhado pelos três
+// setores (o nome vem da origem histórica do fluxo, na Manutenção), mas quem
+// efetivamente aprova muda por setor — o rótulo exibido precisa acompanhar.
+const statusLabel = (status: Status, setor: string): string => {
+  if (status === "AGUARDANDO_APROVACAO_MANUTENCAO") {
+    if (setor === "ALMOXARIFADO") return "Ag. Aprov. Suprimentos";
+    if (setor === "ENGENHARIA")   return "Ag. Aprov. Engenharia";
+  }
+  return STATUS_LABEL[status];
 };
 const STATUS_COLOR: Record<Status, string> = {
   PENDENTE:"bg-slate-100 text-slate-600", COTANDO:"bg-blue-100 text-blue-700",
@@ -112,21 +134,27 @@ export default function PedidosOrcamento({ user, setor }: Props) {
     setor === "ALMOXARIFADO"? "almoxarife"     : "op_suprimentos"
   );
   const nivelAdmin = (user as { nivel?: string }).nivel === "ADMIN";
-  const minhasResp = useMemo(() => new Set(
-    nivelAdmin ? RESPONSABILIDADES_TODAS : (user.responsabilidades?.pedido_orcamento ?? [])
-  ), [nivelAdmin, user.responsabilidades]);
+  const papelAdminGeral = papel === "admin_geral";
+  const minhasResp = useMemo(() => {
+    if (papelAdminGeral) return new Set(RESPONSABILIDADES_TODAS);
+    if (nivelAdmin) return new Set(RESPONSABILIDADES_POR_SETOR[setor] ?? ["solicitante"]);
+    return new Set(user.responsabilidades?.pedido_orcamento ?? []);
+  }, [papelAdminGeral, nivelAdmin, setor, user.responsabilidades]);
   const temResp = useCallback((r: ResponsabilidadePedidoOrcamento) => minhasResp.has(r), [minhasResp]);
 
-  // Pedidos do ALMOXARIFADO (Reposição Automática) não passam pela Manutenção —
-  // quem aprova o orçamento nesse caso é o aprovador de Suprimentos.
-  const podeAprovarOrcamento = useCallback((p: Pedido) =>
-    p.setor === "ALMOXARIFADO" ? temResp("aprovador_suprimentos") : temResp("aprovador_manutencao"),
-  [temResp]);
+  // Cada setor tem seu próprio aprovador: MANUTENCAO passa pelo aprovador_manutencao;
+  // ALMOXARIFADO (Reposição Automática) e ENGENHARIA (materiais de Obra) não
+  // passam pela Manutenção — cada um tem seu aprovador próprio.
+  const podeAprovarOrcamento = useCallback((p: Pedido) => {
+    if (p.setor === "ALMOXARIFADO") return temResp("aprovador_suprimentos");
+    if (p.setor === "ENGENHARIA")   return temResp("aprovador_engenharia");
+    return temResp("aprovador_manutencao");
+  }, [temResp]);
 
   // "Confirmar Recebimento" continua gated por papel/setor, como já era.
-  const podeConfirmarRecebimento = papel === "op_manutencao" || papel === "admin_manutencao" || papel === "almoxarife" || papel === "admin_geral";
-  // "Confirmar Retirada" é feito por quem vai buscar o material (Manutenção) — não pelo Almoxarifado, que já concluiu sua parte no recebimento.
-  const podeConfirmarRetirada = papel === "op_manutencao" || papel === "admin_manutencao" || papel === "admin_geral";
+  const podeConfirmarRecebimento = papel === "op_manutencao" || papel === "admin_manutencao" || papel === "op_engenharia" || papel === "admin_engenharia" || papel === "almoxarife" || papel === "admin_geral";
+  // "Confirmar Retirada" é feito por quem vai buscar o material (Manutenção/Engenharia) — não pelo Almoxarifado, que já concluiu sua parte no recebimento.
+  const podeConfirmarRetirada = papel === "op_manutencao" || papel === "admin_manutencao" || papel === "op_engenharia" || papel === "admin_engenharia" || papel === "admin_geral";
 
   // Pendentes/Pendente de Compra/Em Trânsito/Concluído são um painel geral, somente
   // leitura, visível para qualquer um com acesso ao módulo — só as filas de
@@ -137,7 +165,7 @@ export default function PedidosOrcamento({ user, setor }: Props) {
     if (temResp("solicitante"))           lista.push("Solicitações");
     lista.push("Recebidas");
     if (temResp("cotador"))                lista.push("Em Cotação");
-    if (temResp("aprovador_manutencao") || temResp("aprovador_suprimentos")) lista.push("Aprovar Orçamento");
+    if (temResp("aprovador_manutencao") || temResp("aprovador_suprimentos") || temResp("aprovador_engenharia")) lista.push("Aprovar Orçamento");
     if (temResp("aprovador_suprimentos"))   lista.push("Aprovar Compra");
     lista.push("Pendente de Compra", "Em Trânsito", "Pendente Retirada", "Concluído");
     return lista;
@@ -159,9 +187,26 @@ export default function PedidosOrcamento({ user, setor }: Props) {
   const [filtroDataAte, setFiltroDataAte] = useState("");
 
   const [form, setForm] = useState({
-    urgencia: "MEDIA" as Urgencia, tipo_destino: "FROTA" as TipoDestino,
+    urgencia: "MEDIA" as Urgencia, tipo_destino: (setor === "ENGENHARIA" ? "OBRA" : "FROTA") as TipoDestino,
     destino: "", data_desejada: "", itens: [{ ...ITEM_VAZIO }] as Item[],
   });
+  const [obras, setObras] = useState<ObraOpcao[]>([]);
+  const [materiaisObra, setMateriaisObra] = useState<MaterialObraOpcao[]>([]);
+
+  // Engenharia solicita material vinculado a uma Obra, escolhendo do
+  // Catálogo de Materiais de Obra (RF-028) — mesma lógica da Reposição
+  // Automática do Almoxarifado, só que com Obra no lugar de Frota/Estoque.
+  useEffect(() => {
+    if (setor !== "ENGENHARIA") return;
+    api.obras.list().then(r => {
+      const lista = Array.isArray(r) ? r as ObraOpcao[] : ((r as { data?: ObraOpcao[] })?.data ?? []);
+      setObras(lista.filter(o => o.status === "ATIVA"));
+    }).catch(() => {});
+    api.materiaisObra.list().then(r => {
+      const lista = (r as { data?: MaterialObraOpcao[] })?.data ?? [];
+      setMateriaisObra(Array.isArray(lista) ? lista : Object.values(lista));
+    }).catch(() => {});
+  }, [setor]);
 
   const carregar = useCallback(() => {
     setLoading(true);
@@ -190,6 +235,14 @@ export default function PedidosOrcamento({ user, setor }: Props) {
     [pedidos, setor]
   );
 
+  // Quem cota/aprova compra/compra do lado de Suprimentos pode ser configurado
+  // pra atender só Manutenção, só Engenharia, ou os dois — pedidos do próprio
+  // ALMOXARIFADO (Reposição Automática) nunca são filtrados por isso.
+  const setoresAtendidos = user.setores_atendidos?.pedido_orcamento ?? [];
+  const atendeSetorDoPedido = useCallback((p: Pedido) =>
+    p.setor === "ALMOXARIFADO" || setoresAtendidos.length === 0 || setoresAtendidos.includes(p.setor),
+  [setoresAtendidos]);
+
   // Lista-base de uma aba, antes dos filtros de busca/data. Em "Solicitações",
   // quem só tem a responsabilidade de solicitante acompanha suas próprias
   // solicitações em qualquer status (do PENDENTE ao CONCLUIDO/REJEITADO);
@@ -205,10 +258,14 @@ export default function PedidosOrcamento({ user, setor }: Props) {
     // "Pendente Retirada" é um recorte de Concluído: só os que a Manutenção ainda não retirou
     if (aba === "Pendente Retirada") return base.filter(p => !p.retirado_por);
     // "Aprovar Orçamento" só mostra o que a responsabilidade da pessoa cobre
-    // (ALMOXARIFADO cai pro aprovador de Suprimentos, o resto pra Manutenção)
+    // (ALMOXARIFADO cai pro aprovador de Suprimentos, ENGENHARIA pro aprovador
+    // de Engenharia, o resto pra Manutenção)
     if (aba === "Aprovar Orçamento") return base.filter(podeAprovarOrcamento);
+    // "Em Cotação" e "Aprovar Compra" são filas de Suprimentos — respeitam
+    // os setores que essa pessoa atende, se configurado.
+    if (aba === "Em Cotação" || aba === "Aprovar Compra") return base.filter(atendeSetorDoPedido);
     return base;
-  }, [pedidosVisiveis, temResp, nivelAdmin, user.nome, podeAprovarOrcamento]);
+  }, [pedidosVisiveis, temResp, nivelAdmin, user.nome, podeAprovarOrcamento, atendeSetorDoPedido]);
 
   // Busca por frota/obra/equipamento (destino) ou nº da SC, e filtro por período
   const aplicarFiltros = useCallback((lista: Pedido[]) => {
@@ -296,13 +353,13 @@ export default function PedidosOrcamento({ user, setor }: Props) {
     setSalvando(true);
     try {
       await api.pedidosOrcamento.create({
-        data: todayISO(), data_desejada: form.data_desejada || null, setor: "MANUTENCAO",
+        data: todayISO(), data_desejada: form.data_desejada || null, setor,
         destino: form.destino, tipo_destino: form.tipo_destino,
         urgencia: form.urgencia, itens: form.itens,
       });
       await carregar();
       setShowForm(false);
-      setForm({ urgencia: "MEDIA", tipo_destino: "FROTA", destino: "", data_desejada: "", itens: [{ ...ITEM_VAZIO }] });
+      setForm({ urgencia: "MEDIA", tipo_destino: setor === "ENGENHARIA" ? "OBRA" : "FROTA", destino: "", data_desejada: "", itens: [{ ...ITEM_VAZIO }] });
       toast.success("Solicitação enviada para o Suprimentos!");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao criar solicitação.");
@@ -466,7 +523,7 @@ export default function PedidosOrcamento({ user, setor }: Props) {
                           {p.urgencia.charAt(0)+p.urgencia.slice(1).toLowerCase()}
                         </span>
                         <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${STATUS_COLOR[p.status]}`}>
-                          {STATUS_LABEL[p.status]}
+                          {statusLabel(p.status, p.setor)}
                         </span>
                       </div>
                       <p className="text-xs font-semibold text-slate-700 truncate">{p.destino}</p>
@@ -511,11 +568,15 @@ export default function PedidosOrcamento({ user, setor }: Props) {
             </div>
             <div>
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Tipo de Destino</label>
-              <select value={form.tipo_destino} onChange={e => setForm(p => ({ ...p, tipo_destino:e.target.value as TipoDestino, destino:"" }))} className={inp}>
-                <option value="FROTA">Frota / Equipamento de campo</option>
-                <option value="OBRA">Obra</option>
-                <option value="EQUIPAMENTO">Equipamento interno</option>
-              </select>
+              {setor === "ENGENHARIA" ? (
+                <input value="Obra" disabled className={`${inp} opacity-60`} />
+              ) : (
+                <select value={form.tipo_destino} onChange={e => setForm(p => ({ ...p, tipo_destino:e.target.value as TipoDestino, destino:"" }))} className={inp}>
+                  <option value="FROTA">Frota / Equipamento de campo</option>
+                  <option value="OBRA">Obra</option>
+                  <option value="EQUIPAMENTO">Equipamento interno</option>
+                </select>
+              )}
             </div>
             <div>
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Data Desejada do Material</label>
@@ -525,9 +586,14 @@ export default function PedidosOrcamento({ user, setor }: Props) {
 
           <div>
             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">
-              {form.tipo_destino === "FROTA" ? "Selecionar Frota" : form.tipo_destino === "OBRA" ? "Nome da Obra" : "Selecionar Equipamento"}
+              {form.tipo_destino === "FROTA" ? "Selecionar Frota" : form.tipo_destino === "OBRA" ? "Obra" : "Selecionar Equipamento"}
             </label>
-            {form.tipo_destino === "OBRA"
+            {form.tipo_destino === "OBRA" && setor === "ENGENHARIA"
+              ? <select value={form.destino} onChange={e => setForm(p => ({ ...p, destino:e.target.value }))} className={inp}>
+                  <option value="">Selecione a obra...</option>
+                  {obras.map(o => <option key={o.nome} value={o.nome}>{o.nome}</option>)}
+                </select>
+              : form.tipo_destino === "OBRA"
               ? <input value={form.destino} onChange={e => setForm(p => ({ ...p, destino:e.target.value }))} placeholder="Ex: Obra Rodovia BR-153" className={inp}/>
               : <select value={form.destino} onChange={e => setForm(p => ({ ...p, destino:e.target.value }))} className={inp}>
                   <option value="">Selecione...</option>
@@ -541,10 +607,20 @@ export default function PedidosOrcamento({ user, setor }: Props) {
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Itens Solicitados</label>
               <button onClick={addItem} className="text-[10px] font-bold text-[#EA6C0A] hover:underline">+ Adicionar item</button>
             </div>
+            {setor === "ENGENHARIA" && (
+              <datalist id="materiais-obra-list">
+                {materiaisObra.map(m => <option key={m.codigo} value={m.nome} />)}
+              </datalist>
+            )}
             <div className="space-y-2">
               {form.itens.map((it, i) => (
                 <div key={i} className="grid grid-cols-12 gap-2 items-center">
-                  <input value={it.descricao} onChange={e => setItem(i,"descricao",e.target.value)}
+                  <input value={it.descricao} list={setor === "ENGENHARIA" ? "materiais-obra-list" : undefined}
+                    onChange={e => {
+                      setItem(i, "descricao", e.target.value);
+                      const material = materiaisObra.find(m => m.nome === e.target.value);
+                      if (material) setItem(i, "unidade", material.unidade);
+                    }}
                     placeholder="Descrição do item" className={`${inp} col-span-6`}/>
                   <input type="number" min={1} value={it.quantidade} onChange={e => setItem(i,"quantidade",Number(e.target.value))}
                     className={`${inp} col-span-2`}/>
@@ -704,7 +780,7 @@ export default function PedidosOrcamento({ user, setor }: Props) {
                   {drawer.urgencia.charAt(0)+drawer.urgencia.slice(1).toLowerCase()}
                 </span>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_COLOR[drawer.status]}`}>
-                  {STATUS_LABEL[drawer.status]}
+                  {statusLabel(drawer.status, drawer.setor)}
                 </span>
               </div>
               <div>
