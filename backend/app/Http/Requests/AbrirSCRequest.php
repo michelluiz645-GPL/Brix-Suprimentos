@@ -15,6 +15,7 @@ class AbrirSCRequest extends FormRequest
             'funcao_cargo'       => ['nullable', 'string', 'max:255'],
             'destino'            => ['required', 'in:Frota,Obra,Administração,Manutenção,Outros'],
             'veiculo_frota'      => ['nullable', 'string', 'max:255'],
+            'destino_obra'       => ['nullable', 'string', 'max:255', 'required_if:destino,Obra'],
             'urgencia'           => ['required', 'in:Baixa,Média,Alta,Crítica'],
             'local_entrega'      => ['nullable', 'string', 'max:255'],
             'ponto_referencia'   => ['nullable', 'string', 'max:255'],
@@ -35,6 +36,7 @@ class AbrirSCRequest extends FormRequest
     {
         return [
             'destino.required'        => 'Destino é obrigatório.',
+            'destino_obra.required_if'=> 'Selecione a obra de destino.',
             'urgencia.required'       => 'Urgência é obrigatória.',
             'itens.required'          => 'Adicione pelo menos um item.',
             'itens.*.descricao.required' => 'Descrição do item é obrigatória.',

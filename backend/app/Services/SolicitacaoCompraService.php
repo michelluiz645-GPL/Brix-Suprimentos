@@ -23,6 +23,7 @@ class SolicitacaoCompraService
                 'funcao_cargo'      => $dados['funcao_cargo'] ?? null,
                 'destino'           => $dados['destino'],
                 'veiculo_frota'     => $dados['veiculo_frota'] ?? null,
+                'destino_obra'      => $dados['destino_obra'] ?? null,
                 'urgencia'          => $dados['urgencia'] ?? 'Média',
                 'local_entrega'     => $dados['local_entrega'] ?? null,
                 'ponto_referencia'  => $dados['ponto_referencia'] ?? null,

@@ -15,7 +15,7 @@ class SolicitacaoCompra extends Model
 
     protected $fillable = [
         'numero', 'data_necessaria', 'solicitante_id', 'funcao_cargo',
-        'destino', 'veiculo_frota', 'urgencia', 'local_entrega',
+        'destino', 'veiculo_frota', 'destino_obra', 'urgencia', 'local_entrega',
         'ponto_referencia', 'horario_recebimento', 'motivo', 'ordem_servico',
         'status',
         'cotacao_fornecedor', 'cotacao_fornecedor_telefone', 'cotacao_fornecedor_email',

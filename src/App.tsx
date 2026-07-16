@@ -140,7 +140,7 @@ function AppShell() {
       case "Relatórios":         return <Relatorios />;
       case "Rel. Abastecimento": return <RelatoriosAbastecimento />;
       case "Suprimentos Kobo":   return <SuprimentosKobo />;
-      case "Sol. de Compra":     return <SolicitacaoCompra setor={setor} />;
+      case "Sol. de Compra":     return <SolicitacaoCompra setor={setor} user={auth.user} />;
       case "Pedidos de Compra":  return <PedidosCompra />;
       case "EPI":                return <SegurancaEPI />;
       case "Equipamentos":       return <EquipamentosPesados />;

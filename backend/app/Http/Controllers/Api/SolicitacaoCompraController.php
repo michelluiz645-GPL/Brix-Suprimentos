@@ -124,6 +124,7 @@ class SolicitacaoCompraController extends Controller
             'funcao_cargo'         => $sc->funcao_cargo,
             'destino'              => $sc->destino,
             'veiculo_frota'        => $sc->veiculo_frota,
+            'destino_obra'         => $sc->destino_obra,
             'urgencia'             => $sc->urgencia,
             'local_entrega'        => $sc->local_entrega,
             'ponto_referencia'     => $sc->ponto_referencia,
