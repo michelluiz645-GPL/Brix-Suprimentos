@@ -32,6 +32,7 @@ class CriarSaidaRequest extends FormRequest
             'itens.*.obs'           => ['nullable', 'string'],
             'itens.*.destino'       => ['required', Rule::in(['Para a Equipe', 'Roçada', 'Obra', 'Administração', 'Manutenção', 'Consumível', 'Frota', 'Outros'])],
             'itens.*.destino_frota' => ['nullable', 'string', 'max:20'],
+            'itens.*.destino_obra'  => ['nullable', 'string', 'max:150'],
             'itens.*.colaborador_epi' => ['nullable', 'string', 'max:150'],
         ];
     }
@@ -54,6 +55,9 @@ class CriarSaidaRequest extends FormRequest
             foreach ($this->input('itens', []) as $i => $item) {
                 if (($item['destino'] ?? null) === 'Frota' && empty($item['destino_frota'])) {
                     $validator->errors()->add("itens.{$i}.destino_frota", 'Informe a placa da frota para itens com destino "Frota".');
+                }
+                if (($item['destino'] ?? null) === 'Obra' && empty($item['destino_obra'])) {
+                    $validator->errors()->add("itens.{$i}.destino_obra", 'Selecione a obra para itens com destino "Obra".');
                 }
 
                 $produto = Produto::where('codigo_produto', $item['codigo'] ?? null)->first();

@@ -15,7 +15,7 @@ class Movimento extends Model
         'nome', 'unid', 'qtd', 'preco', 'fornecedor', 'obs', 'almoxarifado',
         'responsavel', 'data', 'usuario',
         'equipe', 'nome_equipe', 'colaborador', 'colaborador_epi',
-        'destino_frota', 'destino', 'tipo_saida', 'entregador', 'epi_vencimento', 'status',
+        'destino_frota', 'destino_obra', 'destino', 'tipo_saida', 'entregador', 'epi_vencimento', 'status',
         'numero_pedido_origem', 'danificado', 'confirmado_por', 'data_confirmacao',
     ];
 

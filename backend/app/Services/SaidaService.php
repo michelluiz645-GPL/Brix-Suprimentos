@@ -66,6 +66,7 @@ class SaidaService
                 'obs'                 => $item['obs'] ?? null,
                 'destino'             => $item['destino'],
                 'destino_frota'       => $item['destino_frota'] ?? null,
+                'destino_obra'        => $item['destino_obra'] ?? null,
                 'almoxarifado'        => $dados['almoxarifado'],
                 'responsavel'         => $dados['resp_almox'],
                 'data'                => $dados['data'],
@@ -90,12 +91,13 @@ class SaidaService
                 ]);
             }
 
-            $elegivel = $item['destino'] === 'Frota' || $item['destino'] === 'Manutenção' || $equipeManutencao;
+            $elegivel = $item['destino'] === 'Frota' || $item['destino'] === 'Manutenção' || $item['destino'] === 'Obra' || $equipeManutencao;
             if ($elegivel) {
                 $itemDebito = [
                     'nome' => $nomeItem, 'qtd' => $item['qtd'], 'unid' => $item['unid'] ?? '',
                     'preco' => (float) ($item['preco'] ?? $variacoes[$i]->preco),
                     'destino_frota' => $item['destino_frota'] ?? null,
+                    'destino_obra' => $item['destino_obra'] ?? null,
                     'categoria' => $produto?->categoria,
                 ];
                 // EPI nunca é cobrado da equipe, mas ganha sua própria linha

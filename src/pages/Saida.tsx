@@ -7,7 +7,8 @@ import { formatCurrency, today } from "@/utils/formatters";
 import type { Product, Team, Employee, Vehicle } from "@/types";
 import { Plus, Trash2 } from "lucide-react";
 
-interface SaidaItem { codigo: string; variacao_id: number | null; nome: string; unid: string; qtd: number; preco: number; obs?: string; destino: string; destino_frota?: string; colaborador_epi?: string; estoque_disponivel?: number; }
+interface SaidaItem { codigo: string; variacao_id: number | null; nome: string; unid: string; qtd: number; preco: number; obs?: string; destino: string; destino_frota?: string; destino_obra?: string; colaborador_epi?: string; estoque_disponivel?: number; }
+interface ObraOpcao { id?: number; nome: string; status: string }
 
 const TIPOS_SAIDA = ["Retirada", "Entrega"];
 const DESTINOS = ["Para a Equipe", "Roçada", "Obra", "Administração", "Manutenção", "Consumível", "Frota", "Outros"];
@@ -19,6 +20,7 @@ export default function Saida() {
   const [equipes, setEquipes]   = useState<Team[]>([]);
   const [funcionarios, setFuncionarios] = useState<Employee[]>([]);
   const [veiculos, setVeiculos] = useState<Vehicle[]>([]);
+  const [obras, setObras]       = useState<ObraOpcao[]>([]);
   const [tipoSaida, setTipoSaida] = useState(TIPOS_SAIDA[0]);
   const [equipe, setEquipe]     = useState("");
   const [colaborador, setColab] = useState("");
@@ -46,6 +48,11 @@ export default function Saida() {
       const d = (r as { data: Vehicle[] }).data ?? [];
       const lista: Vehicle[] = Array.isArray(d) ? d : Object.values(d);
       setVeiculos(lista.filter((v) => v.status === "ATIVO"));
+    });
+    api.obras.list().then((r) => {
+      const d = (r as { data: ObraOpcao[] }).data ?? [];
+      const lista: ObraOpcao[] = Array.isArray(d) ? d : Object.values(d);
+      setObras(lista.filter((o) => o.status === "ATIVA"));
     });
   }, []);
 
@@ -104,6 +111,7 @@ export default function Saida() {
     if (itens.some((i) => i.qtd <= 0))  { toast.error("Todos os itens precisam ter quantidade maior que zero."); return; }
     if (itens.some((i) => !i.destino))  { toast.error("Todos os itens precisam ter um destino selecionado."); return; }
     if (itens.some((i) => i.destino === "Frota" && !i.destino_frota?.trim())) { toast.error("Informe a placa da frota para itens com destino \"Frota\"."); return; }
+    if (itens.some((i) => i.destino === "Obra" && !i.destino_obra?.trim())) { toast.error("Selecione a obra para itens com destino \"Obra\"."); return; }
     const itemEpiSemColaborador = itens.find((i) => products.find((p) => p.codigo_produto === i.codigo)?.categoria === "EPI" && !i.colaborador_epi?.trim());
     if (itemEpiSemColaborador) { toast.error(`Selecione o colaborador para o item de EPI "${itemEpiSemColaborador.nome}".`); return; }
     const over = itens.find((it) => it.estoque_disponivel !== undefined && it.qtd > it.estoque_disponivel);
@@ -230,6 +238,13 @@ export default function Saida() {
                             className="w-32 mt-1 bg-amber-50 border border-amber-300 rounded-lg px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-[#EA6C0A]">
                             <option value="">— Veículo —</option>
                             {veiculos.map((v) => <option key={v.id} value={v.placa}>{v.placa} — {v.modelo}</option>)}
+                          </select>
+                        )}
+                        {item.destino === "Obra" && (
+                          <select value={item.destino_obra ?? ""} onChange={(e) => updateItem(idx, "destino_obra", e.target.value)}
+                            className="w-32 mt-1 bg-amber-50 border border-amber-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-[#EA6C0A]">
+                            <option value="">— Obra —</option>
+                            {obras.map((o) => <option key={o.nome} value={o.nome}>{o.nome}</option>)}
                           </select>
                         )}
                       </td>

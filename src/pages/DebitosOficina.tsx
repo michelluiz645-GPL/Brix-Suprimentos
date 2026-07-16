@@ -22,6 +22,7 @@ export default function DebitosOficina() {
   const [loading, setLoading] = useState(true);
   const [filtroStatus, setFiltroStatus] = useState("");
   const [filtroEquipe, setFiltroEquipe] = useState("");
+  const [filtroObra, setFiltroObra] = useState("");
   const [filtroDataDe, setFiltroDataDe] = useState("");
   const [filtroDataAte, setFiltroDataAte] = useState("");
   const [sel, setSel] = useState<MaintenanceDebit | null>(null);
@@ -83,9 +84,11 @@ export default function DebitosOficina() {
   const updateItem = (i: number, k: keyof DeliveryItem, v: string | number) =>
     setItens((prev) => prev.map((it, idx) => idx === i ? { ...it, [k]: v } : it));
 
-  const filtered = debitos.filter((d) =>
-    !filtroEquipe || (d.equipe || d.nome_equipe || "").toLowerCase().includes(filtroEquipe.toLowerCase())
-  );
+  const filtered = debitos.filter((d) => {
+    const equipeOk = !filtroEquipe || (d.equipe || d.nome_equipe || "").toLowerCase().includes(filtroEquipe.toLowerCase());
+    const obraOk = !filtroObra || (d.itens ?? []).some((it) => (it.destino_obra ?? "").toLowerCase().includes(filtroObra.toLowerCase()));
+    return equipeOk && obraOk;
+  });
 
   // RF-025 — EPI nunca é cobrado da equipe: não entra no que está em
   // aberto/pago, só no Total Geral (visão de gasto, não de dívida).
@@ -110,6 +113,20 @@ export default function DebitosOficina() {
       return acc;
     }, {});
   const categoriasOrdenadas = Object.entries(porCategoria).sort((a, b) => b[1] - a[1]);
+
+  // Gasto por Obra (Engenharia) — mesmo princípio da categoria, mas agrupando
+  // pelo destino_obra de cada item. Só aparece quando existe alguma saída
+  // com destino "Obra" nos débitos carregados.
+  const porObra = debitos
+    .flatMap((d) => d.itens ?? [])
+    .filter((it) => it.destino_obra)
+    .reduce<Record<string, number>>((acc, it) => {
+      const obra = it.destino_obra as string;
+      acc[obra] = (acc[obra] ?? 0) + it.qtd * it.preco;
+      return acc;
+    }, {});
+  const obrasOrdenadas = Object.entries(porObra).sort((a, b) => b[1] - a[1]);
+  const quantidadeObras = obrasOrdenadas.length;
 
   return (
     <>
@@ -154,6 +171,23 @@ export default function DebitosOficina() {
           </div>
         )}
 
+        {quantidadeObras > 0 && (
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Gasto por Obra</p>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-700">{quantidadeObras} obra(s)</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {obrasOrdenadas.map(([obra, valor]) => (
+                <div key={obra} className="bg-white border border-slate-100 rounded-xl p-3 shadow-sm">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 truncate" title={obra}>{obra}</p>
+                  <p className="text-base font-black font-mono text-slate-700">{formatCurrency(valor)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
           <div className="flex flex-wrap gap-3">
             <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)}
@@ -163,6 +197,8 @@ export default function DebitosOficina() {
               <option value="PAGO">Pago</option>
             </select>
             <input value={filtroEquipe} onChange={(e) => setFiltroEquipe(e.target.value)} placeholder="Filtrar por equipe..."
+              className="px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#EA6C0A] w-52" />
+            <input value={filtroObra} onChange={(e) => setFiltroObra(e.target.value)} placeholder="Filtrar por obra..."
               className="px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#EA6C0A] w-52" />
             <div className="flex items-center gap-2">
               <label className="text-[10px] font-bold text-slate-400 uppercase">De</label>
@@ -189,18 +225,20 @@ export default function DebitosOficina() {
           ) : (
             <table className="w-full text-xs">
               <thead><tr className="bg-slate-50 border-b border-slate-100">
-                {["Número", "Data", "Equipe", "Colaborador", "Almox.", "Total", "Status", ""].map((h) => (
+                {["Número", "Data", "Equipe", "Obra", "Colaborador", "Almox.", "Total", "Status", ""].map((h) => (
                   <th key={h} className="p-3 font-semibold text-slate-500 text-left">{h}</th>
                 ))}
               </tr></thead>
               <tbody className="divide-y divide-slate-50">
                 {filtered.map((d) => {
                   const isEpi = d.natureza === "EPI";
+                  const obrasDoDebito = Array.from(new Set((d.itens ?? []).map((it) => it.destino_obra).filter(Boolean)));
                   return (
                     <tr key={d.id} className={`transition-colors ${isEpi ? "bg-amber-50/30 hover:bg-amber-50/60" : "hover:bg-slate-50"}`}>
                       <td className="p-3 font-mono font-bold text-[#EA6C0A]">{d.numero || `#${d.id}`}</td>
                       <td className="p-3 text-slate-500">{formatDate(d.data)}</td>
                       <td className="p-3 font-medium">{d.nome_equipe || d.equipe}</td>
+                      <td className="p-3 text-slate-500">{obrasDoDebito.length > 0 ? obrasDoDebito.join(", ") : "—"}</td>
                       <td className="p-3 text-slate-500">{d.colaborador || "—"}</td>
                       <td className="p-3 text-slate-500">{d.almoxarifado || "—"}</td>
                       <td className="p-3 font-mono font-bold text-slate-700">{formatCurrency(d.total)}</td>

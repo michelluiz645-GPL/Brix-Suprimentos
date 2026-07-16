@@ -188,6 +188,26 @@ class SaidaTest extends TestCase
         $this->assertSame(0, \App\Models\DebitoManutencao::count());
     }
 
+    public function test_destino_obra_exige_obra_selecionada(): void
+    {
+        $this->actingAs($this->operador)
+            ->postJson('/api/saidas', $this->payloadPeca('Obra'))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['itens.0.destino_obra']);
+    }
+
+    public function test_saida_com_destino_obra_gera_debito_com_a_obra_no_item(): void
+    {
+        $payload = $this->payloadPeca('Obra');
+        $payload['itens'][0]['destino_obra'] = 'Obra Rodovia BR-153';
+
+        $this->actingAs($this->operador)->postJson('/api/saidas', $payload)->assertStatus(201);
+
+        $debito = \App\Models\DebitoManutencao::firstOrFail();
+        $this->assertSame('MATERIAL', $debito->natureza);
+        $this->assertSame('Obra Rodovia BR-153', $debito->itens[0]['destino_obra']);
+    }
+
     public function test_equipe_tipo_manutencao_gera_debito_mesmo_com_outro_destino(): void
     {
         Equipe::create(['nome' => 'Equipe Manutenção 01', 'numero' => 'Equipe 01', 'tipo' => 'Manutenção']);
