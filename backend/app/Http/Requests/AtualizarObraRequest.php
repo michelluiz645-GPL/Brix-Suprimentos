@@ -14,6 +14,7 @@ class AtualizarObraRequest extends FormRequest
         return [
             'setor'        => ['sometimes', 'string', 'max:50'],
             'nome'         => ['sometimes', 'string', 'max:255'],
+            'endereco'     => ['sometimes', 'string', 'max:255'],
             'tipo'         => ['sometimes', Rule::in(['PUBLICA', 'PRIVADA'])],
             'descricao'    => ['sometimes', 'nullable', 'string'],
             'responsavel'  => ['sometimes', 'nullable', 'string', 'max:150'],

@@ -17,7 +17,7 @@ const STATUS_CORES: Record<string, string> = {
 };
 
 const emptyForm = (): Omit<Project, "id"> => ({
-  setor: "ENGENHARIA", nome: "", tipo: "PUBLICA", descricao: "",
+  setor: "ENGENHARIA", nome: "", endereco: "", tipo: "PUBLICA", descricao: "",
   responsavel: "", data_inicio: "", data_prev: "", centro_custo: "", status: "ATIVA",
 });
 
@@ -49,7 +49,7 @@ export default function ObrasProjetos() {
   const abrirNovo = () => { setForm(emptyForm()); setSel(null); setModal("novo"); };
   const abrirEditar = (o: Project) => {
     setForm({
-      setor: o.setor, nome: o.nome, tipo: o.tipo ?? "PUBLICA", descricao: o.descricao ?? "",
+      setor: o.setor, nome: o.nome, endereco: o.endereco ?? "", tipo: o.tipo ?? "PUBLICA", descricao: o.descricao ?? "",
       responsavel: o.responsavel ?? "", data_inicio: o.data_inicio ?? "",
       data_prev: o.data_prev ?? "", centro_custo: o.centro_custo ?? "", status: o.status,
     });
@@ -59,6 +59,7 @@ export default function ObrasProjetos() {
   const handleSalvar = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.nome.trim()) { toast.error("Nome da obra é obrigatório."); return; }
+    if (!form.endereco?.trim()) { toast.error("Endereço da obra é obrigatório."); return; }
     if (!form.centro_custo?.trim()) { toast.error("Centro de custo é obrigatório."); return; }
     setSalvando(true);
     try {
@@ -130,6 +131,7 @@ export default function ObrasProjetos() {
                   </div>
                 </div>
                 <div className="space-y-1 text-xs text-slate-500">
+                  {o.endereco && <p><span className="font-bold">Endereço:</span> {o.endereco}</p>}
                   {o.responsavel && <p><span className="font-bold">Responsável:</span> {o.responsavel}</p>}
                   {o.centro_custo && <p><span className="font-bold">Centro de Custo:</span> <span className="font-mono">{o.centro_custo}</span></p>}
                   <div className="flex gap-4 mt-2">
@@ -156,6 +158,10 @@ export default function ObrasProjetos() {
               <div className="col-span-2">
                 <label className={lbl}>Nome da Obra *</label>
                 <input value={form.nome} onChange={setF("nome")} placeholder="Ex: Pavimentação Av. Central" className={inp} />
+              </div>
+              <div className="col-span-2">
+                <label className={lbl}>Endereço *</label>
+                <input value={form.endereco} onChange={setF("endereco")} placeholder="Ex: Av. Central, Km 12 — Bairro Centro" className={inp} />
               </div>
               <div>
                 <label className={lbl}>Tipo</label>
@@ -220,6 +226,7 @@ export default function ObrasProjetos() {
             </div>
             <div className="p-6 space-y-3 text-xs">
               {([
+                ["Endereço", sel.endereco || "—"],
                 ["Tipo", sel.tipo === "PUBLICA" ? "Pública" : "Privada"],
                 ["Responsável", sel.responsavel || "—"],
                 ["Centro de Custo", sel.centro_custo || "—"],

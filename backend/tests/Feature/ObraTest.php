@@ -29,10 +29,11 @@ class ObraTest extends TestCase
     public function test_cria_lista_filtra_e_atualiza_obra(): void
     {
         $criada = $this->actingAs($this->usuario)->postJson('/api/obras', [
-            'nome' => 'Pavimentação Av. Central', 'tipo' => 'PUBLICA', 'centro_custo' => 'CC-2026-001', 'responsavel' => 'Eng. Ana',
+            'nome' => 'Pavimentação Av. Central', 'endereco' => 'Av. Central, Km 12', 'tipo' => 'PUBLICA', 'centro_custo' => 'CC-2026-001', 'responsavel' => 'Eng. Ana',
         ])->assertStatus(201)->json('data');
 
         $this->assertSame('Eng Teste', $criada['criado_por']);
+        $this->assertSame('Av. Central, Km 12', $criada['endereco']);
 
         $this->actingAs($this->usuario)
             ->getJson('/api/obras?status=ATIVA&tipo=PUBLICA')

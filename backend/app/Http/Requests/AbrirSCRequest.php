@@ -11,7 +11,7 @@ class AbrirSCRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'data_necessaria'    => ['nullable', 'date'],
+            'data_necessaria'    => ['nullable', 'date', 'required_if:destino,Obra'],
             'funcao_cargo'       => ['nullable', 'string', 'max:255'],
             'destino'            => ['required', 'in:Frota,Obra,Administração,Manutenção,Outros'],
             'veiculo_frota'      => ['nullable', 'string', 'max:255'],
@@ -36,6 +36,7 @@ class AbrirSCRequest extends FormRequest
     {
         return [
             'destino.required'        => 'Destino é obrigatório.',
+            'data_necessaria.required_if' => 'Data necessária é obrigatória para pedidos de Obra.',
             'destino_obra.required_if'=> 'Selecione a obra de destino.',
             'urgencia.required'       => 'Urgência é obrigatória.',
             'itens.required'          => 'Adicione pelo menos um item.',

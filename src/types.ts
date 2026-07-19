@@ -259,6 +259,7 @@ export interface Project {
   id?: number;
   setor: string;
   nome: string;
+  endereco?: string;
   tipo?: "PUBLICA" | "PRIVADA" | string;
   descricao?: string;
   responsavel?: string;

@@ -11,7 +11,7 @@ class Obra extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'setor', 'nome', 'tipo', 'descricao', 'responsavel',
+        'setor', 'nome', 'endereco', 'tipo', 'descricao', 'responsavel',
         'data_inicio', 'data_prev', 'centro_custo', 'status', 'criado_por_id',
     ];
 

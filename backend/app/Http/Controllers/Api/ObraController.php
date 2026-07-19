@@ -60,7 +60,7 @@ class ObraController extends Controller
     private function serialize(Obra $o): array
     {
         return [
-            'id' => $o->id, 'setor' => $o->setor, 'nome' => $o->nome, 'tipo' => $o->tipo,
+            'id' => $o->id, 'setor' => $o->setor, 'nome' => $o->nome, 'endereco' => $o->endereco, 'tipo' => $o->tipo,
             'descricao' => $o->descricao, 'responsavel' => $o->responsavel,
             'data_inicio' => $o->data_inicio?->format('Y-m-d'), 'data_prev' => $o->data_prev?->format('Y-m-d'),
             'centro_custo' => $o->centro_custo, 'status' => $o->status,

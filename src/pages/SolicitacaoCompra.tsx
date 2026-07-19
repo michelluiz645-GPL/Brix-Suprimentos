@@ -36,7 +36,7 @@ interface SC {
   solicitante?: { nome: string } | null; criado_em?: string;
 }
 
-interface Obra { id: number; nome: string; status?: string; }
+interface Obra { id: number; nome: string; endereco?: string; status?: string; }
 
 const emptyItem = (): SCItem => ({ descricao: "", quantidade: 1, unidade: "UN", fabricante: "", part_number: "", aplicacao_equipamento: "" });
 const emptyForm = (setor: string): Omit<SC, "id"> => ({
@@ -58,6 +58,7 @@ export default function SolicitacaoCompra({ setor = "ENGENHARIA", user }: Props)
   const [modal, setModal] = useState<"novo" | "ver" | null>(null);
   const [sel, setSel] = useState<SC | null>(null);
   const [form, setForm] = useState<Omit<SC, "id">>(emptyForm(setor));
+  const [outroEndereco, setOutroEndereco] = useState(false);
 
   const carregar = () => {
     setLoading(true);
@@ -86,13 +87,14 @@ export default function SolicitacaoCompra({ setor = "ENGENHARIA", user }: Props)
     e.preventDefault();
     if (!form.destino) { toast.error("Destino é obrigatório."); return; }
     if (form.destino === "Obra" && !form.destino_obra.trim()) { toast.error("Selecione a obra de destino."); return; }
+    if (form.destino === "Obra" && !form.data_necessaria.trim()) { toast.error("Data necessária é obrigatória para pedidos de Obra."); return; }
     if (!form.urgencia) { toast.error("Urgência é obrigatória."); return; }
     if (form.itens.some((it) => !it.descricao.trim())) { toast.error("Todos os itens precisam de descrição."); return; }
     setSalvando(true);
     try {
       await api.sc.create(form as object);
       toast.success("Solicitação de compra criada!");
-      setModal(null); setForm(emptyForm(setor)); carregar();
+      setModal(null); setForm(emptyForm(setor)); setOutroEndereco(false); carregar();
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Não foi possível salvar.");
     } finally { setSalvando(false); }
@@ -110,7 +112,7 @@ export default function SolicitacaoCompra({ setor = "ENGENHARIA", user }: Props)
       <div className="space-y-6">
         <PageHeader title="Solicitação de Compra" subtitle="Requisição interna de materiais e serviços"
           action={
-            <button onClick={() => { setForm(emptyForm(setor)); setModal("novo"); }}
+            <button onClick={() => { setForm(emptyForm(setor)); setOutroEndereco(false); setModal("novo"); }}
               className="flex items-center gap-2 px-4 py-2 bg-[#EA6C0A] text-white text-xs font-bold rounded-lg hover:bg-[#C75B12] transition-colors">
               <Plus size={14} /> Nova Solicitação
             </button>
@@ -197,19 +199,39 @@ export default function SolicitacaoCompra({ setor = "ENGENHARIA", user }: Props)
                 {form.destino === "Obra" && (
                   <div>
                     <label className={lbl}>Obra *</label>
-                    <select value={form.destino_obra} onChange={setF("destino_obra")} className={inp}>
+                    <select value={form.destino_obra} onChange={(e) => {
+                      const obra = obras.find((o) => o.nome === e.target.value);
+                      setOutroEndereco(false);
+                      setForm((p) => ({ ...p, destino_obra: e.target.value, local_entrega: obra?.endereco ?? "" }));
+                    }} className={inp}>
                       <option value="">Selecione a obra...</option>
                       {obras.map((o) => <option key={o.id} value={o.nome}>{o.nome}</option>)}
                     </select>
                   </div>
                 )}
                 <div>
-                  <label className={lbl}>Data Necessária</label>
+                  <label className={lbl}>Data Necessária{form.destino === "Obra" ? " *" : ""}</label>
                   <input type="date" value={form.data_necessaria} onChange={setF("data_necessaria")} className={inp} />
                 </div>
                 <div className="col-span-2">
-                  <label className={lbl}>Local de Entrega</label>
-                  <input value={form.local_entrega} onChange={setF("local_entrega")} placeholder="Ex: Almoxarifado Central, Obra Km 12..." className={inp} />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className={`${lbl} mb-0`}>Local de Entrega</label>
+                    {form.destino === "Obra" && form.destino_obra && (
+                      <label className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-500 cursor-pointer">
+                        <input type="checkbox" checked={outroEndereco}
+                          onChange={(e) => {
+                            const obra = obras.find((o) => o.nome === form.destino_obra);
+                            setOutroEndereco(e.target.checked);
+                            if (!e.target.checked) setForm((p) => ({ ...p, local_entrega: obra?.endereco ?? "" }));
+                          }} />
+                        Usar outro endereço
+                      </label>
+                    )}
+                  </div>
+                  <input value={form.local_entrega} onChange={setF("local_entrega")}
+                    disabled={form.destino === "Obra" && !!form.destino_obra && !outroEndereco}
+                    placeholder="Ex: Almoxarifado Central, Obra Km 12..."
+                    className={`${inp} ${form.destino === "Obra" && !!form.destino_obra && !outroEndereco ? "opacity-60 cursor-not-allowed" : ""}`} />
                 </div>
                 <div className="col-span-2">
                   <label className={lbl}>Motivo da Compra</label>
