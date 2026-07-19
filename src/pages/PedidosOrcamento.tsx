@@ -348,6 +348,7 @@ export default function PedidosOrcamento({ user, setor }: Props) {
 
   const handleCriar = async () => {
     if (!form.destino.trim()) { toast.error("Selecione o destino do pedido."); return; }
+    if (!form.data_desejada.trim()) { toast.error("Data desejada do material é obrigatória."); return; }
     const invalido = form.itens.findIndex(i => !i.descricao.trim() || i.quantidade <= 0);
     if (invalido >= 0) { toast.error(`Item ${invalido + 1}: preencha a descrição e quantidade.`); return; }
     setSalvando(true);
@@ -579,7 +580,7 @@ export default function PedidosOrcamento({ user, setor }: Props) {
               )}
             </div>
             <div>
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Data Desejada do Material</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Data Desejada do Material *</label>
               <input type="date" min={todayISO()} value={form.data_desejada} onChange={e => setForm(p => ({ ...p, data_desejada:e.target.value }))} className={inp}/>
             </div>
           </div>

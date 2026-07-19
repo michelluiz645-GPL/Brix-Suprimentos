@@ -99,7 +99,7 @@ class PedidoOrcamentoControllerTest extends TestCase
     public function test_nao_permite_novo_pedido_de_reposicao_para_produto_com_pedido_em_aberto(): void
     {
         $payload = [
-            'data' => '2026-07-13', 'setor' => 'ALMOXARIFADO', 'destino' => 'Reposição de estoque — Filtro',
+            'data' => '2026-07-13', 'data_desejada' => '2026-07-20', 'setor' => 'ALMOXARIFADO', 'destino' => 'Reposição de estoque — Filtro',
             'tipo_destino' => 'ESTOQUE', 'urgencia' => 'CRITICA',
             'itens' => [['descricao' => 'Filtro de Óleo', 'quantidade' => 10, 'unidade' => 'UNID', 'codigo_produto' => '902']],
         ];
@@ -114,7 +114,7 @@ class PedidoOrcamentoControllerTest extends TestCase
     public function test_permite_novo_pedido_apos_o_anterior_ser_rejeitado(): void
     {
         $payload = [
-            'data' => '2026-07-13', 'setor' => 'ALMOXARIFADO', 'destino' => 'Reposição de estoque — Filtro',
+            'data' => '2026-07-13', 'data_desejada' => '2026-07-20', 'setor' => 'ALMOXARIFADO', 'destino' => 'Reposição de estoque — Filtro',
             'tipo_destino' => 'ESTOQUE', 'urgencia' => 'CRITICA',
             'itens' => [['descricao' => 'Filtro de Óleo', 'quantidade' => 10, 'unidade' => 'UNID', 'codigo_produto' => '902']],
         ];
@@ -205,7 +205,7 @@ class PedidoOrcamentoControllerTest extends TestCase
         $aprovadorEngenharia = $this->criarUsuario('admin_engenharia', Setor::ENGENHARIA, ['aprovador_engenharia']);
 
         $pedido = $this->actingAs($this->admin)->postJson('/api/pedidos-orcamento', [
-            'data' => '2026-07-16', 'setor' => 'ENGENHARIA', 'destino' => 'Obra Teste',
+            'data' => '2026-07-16', 'data_desejada' => '2026-07-25', 'setor' => 'ENGENHARIA', 'destino' => 'Obra Teste',
             'tipo_destino' => 'OBRA', 'urgencia' => 'ALTA',
             'itens' => [['descricao' => 'Cimento', 'quantidade' => 10, 'unidade' => 'Saco']],
         ])->json('data');
