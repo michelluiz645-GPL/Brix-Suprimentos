@@ -14,6 +14,7 @@ class AtualizarEquipeRequest extends FormRequest
         return [
             'nome'        => ['sometimes', 'string', 'max:150'],
             'numero'      => ['sometimes', 'string', 'max:20', Rule::unique('equipes', 'numero')->ignore($this->route('equipe'))],
+            'centro_custo'=> ['sometimes', 'nullable', 'string', 'max:100'],
             'responsavel' => ['sometimes', 'nullable', 'string', 'max:150'],
             'veiculo'     => ['sometimes', 'nullable', 'string', 'max:100'],
             'tipo'        => ['sometimes', Rule::in(['Manutenção', 'Conservação', 'Terraplanagem', 'Roçada', 'Outro'])],

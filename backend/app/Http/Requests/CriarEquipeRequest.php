@@ -14,6 +14,7 @@ class CriarEquipeRequest extends FormRequest
         return [
             'nome'        => ['required', 'string', 'max:150'],
             'numero'      => ['required', 'string', 'max:20', 'unique:equipes,numero'],
+            'centro_custo'=> ['nullable', 'string', 'max:100'],
             'responsavel' => ['nullable', 'string', 'max:150'],
             'veiculo'     => ['nullable', 'string', 'max:100'],
             'tipo'        => ['required', Rule::in(['Manutenção', 'Conservação', 'Terraplanagem', 'Roçada', 'Outro'])],

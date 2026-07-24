@@ -29,8 +29,10 @@ class EquipeTest extends TestCase
     public function test_cria_lista_e_atualiza_equipe(): void
     {
         $criada = $this->actingAs($this->usuario)->postJson('/api/equipes', [
-            'nome' => 'Equipe Terraplanagem Norte', 'numero' => '01', 'tipo' => 'Terraplanagem',
+            'nome' => 'Equipe Terraplanagem Norte', 'numero' => '01', 'centro_custo' => 'CC-2026-001', 'tipo' => 'Terraplanagem',
         ])->assertStatus(201)->json('data');
+
+        $this->assertSame('CC-2026-001', $criada['centro_custo']);
 
         $this->actingAs($this->usuario)->getJson('/api/equipes')->assertJsonCount(1, 'data.data');
 

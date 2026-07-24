@@ -9,5 +9,5 @@ class Equipe extends Model
 {
     use SoftDeletes;
 
-    protected $fillable = ['nome', 'numero', 'responsavel', 'veiculo', 'tipo'];
+    protected $fillable = ['nome', 'numero', 'centro_custo', 'responsavel', 'veiculo', 'tipo'];
 }

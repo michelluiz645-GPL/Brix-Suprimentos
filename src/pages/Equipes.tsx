@@ -11,7 +11,7 @@ const lbl = "text-[10px] font-bold text-slate-500 uppercase tracking-widest bloc
 
 const TIPOS_OPERACAO = ["Manutenção", "Conservação", "Terraplanagem", "Roçada", "Outro"];
 
-const emptyForm = () => ({ nome: "", numero: "", responsavel: "", veiculo: "", tipo: TIPOS_OPERACAO[0] });
+const emptyForm = () => ({ nome: "", numero: "", centro_custo: "", responsavel: "", veiculo: "", tipo: TIPOS_OPERACAO[0] });
 
 export default function Equipes() {
   const toast = useToast();
@@ -43,7 +43,7 @@ export default function Equipes() {
 
   const abrirNovo = () => { setForm(emptyForm()); setSel(null); setModal("novo"); };
   const abrirEditar = (t: Team) => {
-    setForm({ nome: t.nome, numero: t.numero, responsavel: t.responsavel ?? "", veiculo: t.veiculo ?? "", tipo: t.tipo ?? TIPOS_OPERACAO[0] });
+    setForm({ nome: t.nome, numero: t.numero, centro_custo: t.centro_custo ?? "", responsavel: t.responsavel ?? "", veiculo: t.veiculo ?? "", tipo: t.tipo ?? TIPOS_OPERACAO[0] });
     setSel(t); setModal("editar");
   };
 
@@ -100,6 +100,7 @@ export default function Equipes() {
                   {eq.tipo && (
                     <span className="inline-block mb-2 text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{eq.tipo}</span>
                   )}
+                  {eq.centro_custo && <p className="text-xs text-slate-500 mb-1"><span className="font-bold">Centro de Custo:</span> <span className="font-mono">{eq.centro_custo}</span></p>}
                   {eq.responsavel && <p className="text-xs text-slate-500 mb-1"><span className="font-bold">Responsável:</span> {eq.responsavel}</p>}
                   {eq.veiculo && <p className="text-xs text-slate-500 mb-3"><span className="font-bold">Veículo:</span> {eq.veiculo}</p>}
                   <div className="border-t border-slate-50 pt-3">
@@ -139,6 +140,10 @@ export default function Equipes() {
               <div>
                 <label className={lbl}>Número da Equipe *</label>
                 <input value={form.numero} onChange={setF("numero")} placeholder="Ex: 01" className={inp} />
+              </div>
+              <div>
+                <label className={lbl}>Centro de Custo</label>
+                <input value={form.centro_custo} onChange={setF("centro_custo")} placeholder="Ex: CC-2026-001" className={`${inp} font-mono`} />
               </div>
               <div>
                 <label className={lbl}>Tipo de Operação *</label>
