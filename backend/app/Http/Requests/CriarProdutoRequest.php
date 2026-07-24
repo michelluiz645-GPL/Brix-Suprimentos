@@ -21,6 +21,7 @@ class CriarProdutoRequest extends FormRequest
             'armario'           => ['nullable', 'string', 'max:50'],
             'prateleira'        => ['nullable', 'string', 'max:50'],
             'dias_validade_epi' => ['nullable', 'integer', 'min:0'],
+            'marca_obrigatoria' => ['nullable', 'boolean'],
             'status'            => ['nullable', Rule::in(['ATIVO', 'INATIVO'])],
 
             // Um mesmo produto interno pode ter várias marcas equivalentes

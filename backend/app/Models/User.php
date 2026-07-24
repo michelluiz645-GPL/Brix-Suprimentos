@@ -99,10 +99,17 @@ class User extends Authenticatable
             return true;
         }
 
-        if ($this->isAdmin()) {
-            return $moduloChave === 'pedido_orcamento'
-                ? $this->admSetorCobreResponsabilidade($responsabilidade)
-                : true;
+        if ($this->isAdmin() && $moduloChave === 'pedido_orcamento') {
+            return $this->admSetorCobreResponsabilidade($responsabilidade);
+        }
+
+        // requisicao_almoxarifado é 100% configurável por usuário — "enviar"
+        // e "receber" não têm bypass automático de Admin, nem de setor,
+        // diferente de pedido_orcamento (aqui não existe "faz sentido pro
+        // setor": um Admin de Engenharia só recebe pedido se isso for
+        // marcado nele individualmente).
+        if ($this->isAdmin() && $moduloChave !== 'requisicao_almoxarifado') {
+            return true;
         }
 
         $pivot = $this->modulos()->where('chave', $moduloChave)->first()?->pivot;

@@ -22,6 +22,14 @@ class Modulo extends Model
         'comprador',
     ];
 
+    // Requisição de Almoxarifado: "enviar" (solicitante) e "receber"
+    // (aprovador — aprova e separa) são independentes, configuráveis por
+    // usuário, sem amarração a setor/papel.
+    public const RESPONSABILIDADES_REQUISICAO_ALMOXARIFADO = [
+        'solicitante',
+        'aprovador',
+    ];
+
     public function usuarios(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'user_modulo')

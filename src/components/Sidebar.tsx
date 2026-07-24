@@ -5,7 +5,7 @@ import {
   ClipboardList, Wrench, User, Users, Car, FileSpreadsheet,
   DownloadCloud, ShoppingCart, FileText, ShieldAlert, Building2,
   Factory, AlertTriangle, Database, UserCheck, ChevronLeft,
-  ChevronRight, LogOut, RefreshCw, BookOpen, ClipboardEdit,
+  ChevronRight, LogOut, RefreshCw, BookOpen, ClipboardEdit, PackageSearch,
 } from "lucide-react";
 import type { User as UserType, Setor } from "@/types";
 
@@ -38,6 +38,7 @@ const ICONS: Record<string, React.ReactNode> = {
   "Suprimentos Kobo":   <DownloadCloud size={18} />,
   "Pedidos de Compra":  <ShoppingCart size={18} />,
   "Ped. Orçamento":     <ClipboardList size={18} />,
+  "Req. Almoxarifado":  <PackageSearch size={18} />,
   "Sol. de Compra":     <ClipboardEdit size={18} />,
   "Nova SC":            <ClipboardEdit size={18} />,
   "Meus Pedidos SC":    <ClipboardList size={18} />,
@@ -60,29 +61,29 @@ const MENUS_BY_SECTOR: Record<string, string[]> = {
     "Dashboard", "Consultar", "Entrada", "Saída", "Histórico Cupons",
     "Devolução", "Entregas Pend.", "Combustíveis", "Produtos",
     "Valor Estoque", "Inventário", "Funcionários", "Equipes", "Frotas",
-    "Reposição Auto.", "Ped. Orçamento", "EPI",
+    "Reposição Auto.", "Ped. Orçamento", "Req. Almoxarifado", "EPI",
     "Suprimentos Kobo", "Backup", "Usuários",
   ],
   ALMOXARIFADO_OPERADOR: [
     "Dashboard", "Consultar", "Entrada", "Saída", "Histórico Cupons",
     "Devolução", "Entregas Pend.", "Combustíveis", "Produtos",
-    "Funcionários", "Equipes", "Frotas", "Reposição Auto.", "Ped. Orçamento", "EPI",
+    "Funcionários", "Equipes", "Frotas", "Reposição Auto.", "Ped. Orçamento", "Req. Almoxarifado", "EPI",
   ],
   ENGENHARIA_ADMIN: [
     "Obras & Projetos", "Catálogo Obra", "Fornecedores",
-    "Sol. de Compra", "Pedidos de Compra", "Ped. Orçamento", "EPI", "Equipamentos",
+    "Sol. de Compra", "Pedidos de Compra", "Ped. Orçamento", "Req. Almoxarifado", "EPI", "Equipamentos",
     "Débitos Manut.", "Suprimentos Kobo", "Rel. Abastecimento", "Backup",
   ],
   ENGENHARIA_OPERADOR: [
     "Obras & Projetos", "Catálogo Obra",
-    "Sol. de Compra", "Pedidos de Compra", "Ped. Orçamento", "EPI", "Equipamentos",
+    "Sol. de Compra", "Pedidos de Compra", "Ped. Orçamento", "Req. Almoxarifado", "EPI", "Equipamentos",
     "Débitos Manut.", "Suprimentos Kobo", "Rel. Abastecimento",
   ],
   MANUTENCAO_ADMIN: [
-    "Ped. Orçamento", "EPI", "Equipamentos", "Débitos Manut.",
+    "Ped. Orçamento", "Req. Almoxarifado", "EPI", "Equipamentos", "Débitos Manut.",
   ],
   MANUTENCAO_OPERADOR: [
-    "Ped. Orçamento", "EPI", "Equipamentos", "Débitos Manut.",
+    "Ped. Orçamento", "Req. Almoxarifado", "EPI", "Equipamentos", "Débitos Manut.",
   ],
 };
 
@@ -113,6 +114,7 @@ const MENU_PARA_MODULO_CHAVE: Record<string, string> = {
   "Frotas":             "frotas_veiculos",
   "Reposição Auto.":    "reposicao_automatica",
   "Ped. Orçamento":     "pedido_orcamento",
+  "Req. Almoxarifado":  "requisicao_almoxarifado",
   "Suprimentos Kobo":   "suprimentos_kobo",
   "Backup":             "seguranca_dados",
   "Usuários":           "administracao_usuarios",

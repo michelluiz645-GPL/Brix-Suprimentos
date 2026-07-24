@@ -141,6 +141,7 @@ class ProdutoController extends Controller
             'armario'           => $produto->armario,
             'prateleira'        => $produto->prateleira,
             'dias_validade_epi' => $produto->dias_validade_epi,
+            'marca_obrigatoria' => (bool) $produto->marca_obrigatoria,
             'status'            => $produto->status,
             'variacoes'         => $produto->variacoes->map(fn ($v) => [
                 'id'                => $v->id,

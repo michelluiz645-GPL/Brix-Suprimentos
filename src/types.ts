@@ -43,6 +43,15 @@ export const RESPONSABILIDADE_PEDIDO_ORCAMENTO_LABELS: Record<ResponsabilidadePe
   comprador:              "Comprador (Suprimentos)",
 };
 
+// Requisição de Almoxarifado: "enviar" (solicitante) e "receber" (aprovador)
+// são independentes — um usuário pode ter só uma, a outra, ou as duas.
+export type ResponsabilidadeRequisicaoAlmoxarifado = "solicitante" | "aprovador";
+
+export const RESPONSABILIDADE_REQUISICAO_ALMOXARIFADO_LABELS: Record<ResponsabilidadeRequisicaoAlmoxarifado, string> = {
+  solicitante: "Enviar (abre requisição)",
+  aprovador:   "Receber (aprova e separa)",
+};
+
 export interface User {
   id?: number;
   login: string;
@@ -136,6 +145,7 @@ export interface Team {
   id?: number;
   nome: string;
   numero: string;
+  centro_custo?: string;
   responsavel?: string;
   veiculo?: string;
   tipo?: string;

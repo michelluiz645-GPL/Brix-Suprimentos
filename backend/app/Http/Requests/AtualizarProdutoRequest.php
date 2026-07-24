@@ -20,6 +20,7 @@ class AtualizarProdutoRequest extends FormRequest
             'armario'           => ['sometimes', 'nullable', 'string', 'max:50'],
             'prateleira'        => ['sometimes', 'nullable', 'string', 'max:50'],
             'dias_validade_epi' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'marca_obrigatoria' => ['sometimes', 'boolean'],
             'status'            => ['sometimes', Rule::in(['ATIVO', 'INATIVO'])],
 
             // Se enviado, substitui o conjunto de marcas/variações do produto

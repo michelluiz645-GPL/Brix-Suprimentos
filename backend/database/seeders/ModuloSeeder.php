@@ -56,6 +56,9 @@ class ModuloSeeder extends Seeder
 
             // ── Pedido de Orçamento (Manutenção/Engenharia → visível no Almoxarifado) ──
             ['chave' => 'pedido_orcamento', 'nome' => 'Pedido de Orçamento', 'setores_aplicaveis' => [$man, $eng, $alm]],
+
+            // ── Requisição de Almoxarifado (Manutenção/Engenharia pedem o que já existe em estoque) ──
+            ['chave' => 'requisicao_almoxarifado', 'nome' => 'Requisição de Almoxarifado', 'setores_aplicaveis' => [$man, $eng, $alm]],
         ];
 
         foreach ($modulos as $modulo) {

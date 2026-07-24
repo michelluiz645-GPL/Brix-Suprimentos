@@ -31,30 +31,30 @@ class PermissaoService
                 'fichas_produtos', 'valor_estoque', 'inventario_geral',
                 'funcionarios', 'equipes_campo', 'frotas_veiculos', 'reposicao_automatica',
                 'fornecedores', 'suprimentos_kobo', 'seguranca_dados',
-                'administracao_usuarios', 'pedido_orcamento',
+                'administracao_usuarios', 'pedido_orcamento', 'requisicao_almoxarifado',
             ],
         ],
         Setor::ENGENHARIA => [
             User::NIVEL_OPERADOR => [
                 'obras_projetos', 'catalogo_materiais_obra', 'rel_abastecimentos',
                 'suprimentos_kobo', 'solicitacao_compra', 'pedido_compra', 'pedido_orcamento',
-                'seguranca_epi', 'equipamentos_pesados', 'debitos_manutencao',
+                'seguranca_epi', 'equipamentos_pesados', 'debitos_manutencao', 'requisicao_almoxarifado',
             ],
             User::NIVEL_ADMIN => [
                 'obras_projetos', 'catalogo_materiais_obra', 'fornecedores',
                 'rel_abastecimentos', 'suprimentos_kobo', 'solicitacao_compra',
                 'pedido_compra', 'pedido_orcamento', 'seguranca_epi', 'equipamentos_pesados',
-                'debitos_manutencao', 'seguranca_dados',
+                'debitos_manutencao', 'seguranca_dados', 'requisicao_almoxarifado',
             ],
         ],
         Setor::MANUTENCAO => [
             User::NIVEL_OPERADOR => [
                 'solicitacao_compra', 'pedido_compra', 'pedido_orcamento',
-                'seguranca_epi', 'equipamentos_pesados', 'debitos_manutencao',
+                'seguranca_epi', 'equipamentos_pesados', 'debitos_manutencao', 'requisicao_almoxarifado',
             ],
             User::NIVEL_ADMIN => [
                 'solicitacao_compra', 'pedido_compra', 'pedido_orcamento',
-                'seguranca_epi', 'equipamentos_pesados', 'debitos_manutencao',
+                'seguranca_epi', 'equipamentos_pesados', 'debitos_manutencao', 'requisicao_almoxarifado',
             ],
         ],
     ];

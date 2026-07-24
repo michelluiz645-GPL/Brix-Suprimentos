@@ -187,6 +187,17 @@ export const api = {
     entradaParcial: (id: number, data: object) => request<object>(`/sc/${id}/entrada-parcial`, { method: "POST", body: JSON.stringify(data) }),
   },
 
+  requisicoesAlmoxarifado: {
+    produtosDisponiveis: () => request<object[]>("/requisicoes-almoxarifado/produtos-disponiveis"),
+    list:   (params?: string) => request<object[]>(`/requisicoes-almoxarifado${params ? `?${params}` : ""}`),
+    show:   (id: number)      => request<object>(`/requisicoes-almoxarifado/${id}`),
+    create: (data: object)    => request<object>("/requisicoes-almoxarifado", { method: "POST", body: JSON.stringify(data) }),
+    aprovar: (id: number)              => request<object>(`/requisicoes-almoxarifado/${id}/aprovar`, { method: "POST" }),
+    rejeitar: (id: number, data: object) => request<object>(`/requisicoes-almoxarifado/${id}/rejeitar`, { method: "POST", body: JSON.stringify(data) }),
+    cancelar: (id: number, data: object) => request<object>(`/requisicoes-almoxarifado/${id}/cancelar`, { method: "POST", body: JSON.stringify(data) }),
+    confirmarSeparacao: (id: number, data: object) => request<object>(`/requisicoes-almoxarifado/${id}/confirmar-separacao`, { method: "POST", body: JSON.stringify(data) }),
+  },
+
   sistema: {
     status: ()    => request<{ connected: boolean; message: string; kobo_configurado: boolean }>("/sistema/status"),
     backup: ()    => request<{ arquivo: string; tamanho_kb: number; conteudo_base64: string }>("/sistema/backup"),

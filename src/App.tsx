@@ -37,6 +37,7 @@ import Usuarios       from "@/pages/Usuarios";
 import CatalogoObra   from "@/pages/CatalogoObra";
 import ReposicaoAutomatica from "@/pages/ReposicaoAutomatica";
 import PedidosOrcamento  from "@/pages/PedidosOrcamento";
+import RequisicaoAlmoxarifado from "@/pages/RequisicaoAlmoxarifado";
 
 interface AuthState {
   user: User;
@@ -148,6 +149,7 @@ function AppShell() {
       case "Backup":             return <SegurancaDados />;
       case "Usuários":           return <Usuarios />;
       case "Ped. Orçamento":     return <PedidosOrcamento user={auth.user} setor={setor} />;
+      case "Req. Almoxarifado":  return <RequisicaoAlmoxarifado user={auth.user} setor={setor} />;
       default:
         return (
           <div className="bg-white border border-slate-100 rounded-xl p-10 text-center max-w-xl mx-auto my-8 shadow-sm">

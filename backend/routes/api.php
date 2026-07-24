@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\PedidoCompraController;
 use App\Http\Controllers\Api\SaidaController;
 use App\Http\Controllers\Api\PedidoOrcamentoController;
 use App\Http\Controllers\Api\ProdutoController;
+use App\Http\Controllers\Api\RequisicaoAlmoxarifadoController;
 use App\Http\Controllers\Api\SistemaController;
 use App\Http\Controllers\Api\SolicitacaoCompraController;
 use App\Http\Controllers\Api\UsuarioController;
@@ -206,4 +207,32 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/sc/{sc}/entrada-parcial',
         [SolicitacaoCompraController::class, 'darEntradaParcial']
     )->middleware('papel:almoxarife,op_suprimentos,admin_suprimentos');
+
+    // Requisição de Almoxarifado — Engenharia/Manutenção pedem item já
+    // existente em estoque (EPI, ferramenta, consumível); Almoxarifado
+    // aprova (não debita) e só debita de verdade ao confirmar a separação.
+    // "Enviar" (solicitante) e "receber" (aprovador) são responsabilidades
+    // configuráveis por usuário — não fixas por papel/setor (RN-002.2).
+    Route::get('/requisicoes-almoxarifado/produtos-disponiveis', [RequisicaoAlmoxarifadoController::class, 'produtosDisponiveis']);
+    Route::get('/requisicoes-almoxarifado', [RequisicaoAlmoxarifadoController::class, 'index']);
+    Route::get('/requisicoes-almoxarifado/{requisicao}', [RequisicaoAlmoxarifadoController::class, 'show']);
+
+    Route::post('/requisicoes-almoxarifado', [RequisicaoAlmoxarifadoController::class, 'store'])
+        ->middleware('responsabilidade:requisicao_almoxarifado,solicitante');
+
+    Route::post('/requisicoes-almoxarifado/{requisicao}/aprovar',
+        [RequisicaoAlmoxarifadoController::class, 'aprovar']
+    )->middleware('responsabilidade:requisicao_almoxarifado,aprovador');
+
+    Route::post('/requisicoes-almoxarifado/{requisicao}/rejeitar',
+        [RequisicaoAlmoxarifadoController::class, 'rejeitar']
+    )->middleware('responsabilidade:requisicao_almoxarifado,aprovador');
+
+    Route::post('/requisicoes-almoxarifado/{requisicao}/cancelar',
+        [RequisicaoAlmoxarifadoController::class, 'cancelar']
+    )->middleware('responsabilidade:requisicao_almoxarifado,aprovador');
+
+    Route::post('/requisicoes-almoxarifado/{requisicao}/confirmar-separacao',
+        [RequisicaoAlmoxarifadoController::class, 'confirmarSeparacao']
+    )->middleware('responsabilidade:requisicao_almoxarifado,aprovador');
 });

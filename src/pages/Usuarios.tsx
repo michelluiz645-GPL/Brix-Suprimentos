@@ -4,8 +4,8 @@ import Modal from "@/components/Modal";
 import PageHeader from "@/components/PageHeader";
 import { useToast } from "@/hooks/useToast";
 import ToastContainer from "@/components/Toast";
-import type { User, ResponsabilidadePedidoOrcamento } from "@/types";
-import { PAPEL_LABELS, RESPONSABILIDADE_PEDIDO_ORCAMENTO_LABELS } from "@/types";
+import type { User, ResponsabilidadePedidoOrcamento, ResponsabilidadeRequisicaoAlmoxarifado } from "@/types";
+import { PAPEL_LABELS, RESPONSABILIDADE_PEDIDO_ORCAMENTO_LABELS, RESPONSABILIDADE_REQUISICAO_ALMOXARIFADO_LABELS } from "@/types";
 import { Plus, Edit, Lock } from "lucide-react";
 import CadastroUsuario from "@/pages/Usuarios/CadastroUsuario";
 
@@ -32,6 +32,7 @@ const MODULOS_ALL: { chave: string; label: string }[] = [
   { chave: "solicitacao_compra",     label: "Solicitação de Compra" },
   { chave: "pedido_compra",          label: "Pedido de Compra" },
   { chave: "pedido_orcamento",       label: "Pedido de Orçamento" },
+  { chave: "requisicao_almoxarifado",label: "Requisição de Almoxarifado" },
   { chave: "obras_projetos",         label: "Obras & Projetos" },
   { chave: "catalogo_materiais_obra",label: "Catálogo de Obras" },
   { chave: "rel_abastecimentos",     label: "Rel. Abastecimentos" },
@@ -61,6 +62,11 @@ const RESPONSABILIDADES_POR_SETOR: Record<string, ResponsabilidadePedidoOrcament
 };
 
 const RESPOSTAS_SUPRIMENTOS: ResponsabilidadePedidoOrcamento[] = ["cotador", "aprovador_suprimentos", "comprador"];
+
+// Requisição de Almoxarifado: "enviar"/"receber" valem pra qualquer setor,
+// sem restrição — quem decide é o Admin, marcando o que fizer sentido pra
+// cada pessoa (ex.: alguém do Almoxarifado também pode enviar).
+const RESPONSABILIDADES_REQUISICAO_ALMOXARIFADO: ResponsabilidadeRequisicaoAlmoxarifado[] = ["solicitante", "aprovador"];
 
 const labelResponsabilidade = (resp: ResponsabilidadePedidoOrcamento, setor: string): string => {
   if (resp === "solicitante") {
@@ -334,6 +340,32 @@ export default function Usuarios() {
                         </div>
                       </div>
                     )}
+                  </div>
+                );
+              })()}
+
+              {(form.modulos ?? []).includes("requisicao_almoxarifado") && (() => {
+                const respsAtuais = form.responsabilidades?.requisicao_almoxarifado ?? [];
+                return (
+                  <div className="mt-3 p-3 bg-orange-50/50 border border-orange-100 rounded-lg">
+                    <label className="text-[10px] font-bold text-[#C75B12] uppercase tracking-widest block mb-2">
+                      Requisição de Almoxarifado
+                    </label>
+                    <p className="text-[10px] text-slate-500 mb-2">Enviar (abrir pedido) e receber (aprovar/separar) são independentes — marque uma, outra, ou as duas.</p>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {RESPONSABILIDADES_REQUISICAO_ALMOXARIFADO.map((resp) => {
+                        const checked = respsAtuais.includes(resp);
+                        return (
+                          <label key={resp} className={`flex items-center gap-2 cursor-pointer px-2 py-1.5 rounded-lg border text-xs transition-colors ${checked ? "bg-[#EA6C0A]/10 border-[#EA6C0A]/30 text-[#C75B12] font-semibold" : "bg-white border-slate-200 text-slate-500"}`}>
+                            <input type="checkbox" checked={checked} onChange={() => toggleResponsabilidade("requisicao_almoxarifado", resp)} className="hidden" />
+                            <span className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 ${checked ? "bg-[#EA6C0A] border-[#EA6C0A]" : "border-slate-300"}`}>
+                              {checked && <span className="text-white text-[8px] font-bold">✓</span>}
+                            </span>
+                            {RESPONSABILIDADE_REQUISICAO_ALMOXARIFADO_LABELS[resp]}
+                          </label>
+                        );
+                      })}
+                    </div>
                   </div>
                 );
               })()}
